@@ -1,0 +1,28 @@
+# build output and generated files
+build/
+*.apk
+*.dex
+*.class
+
+# signing material: never commit keys or keystores
+*.keystore
+*.jks
+*.pk8
+*.pem
+*.p12
+
+# personal data and raw device logs (drive logs, crash dumps, screenshots of the unit)
+logs/
+drive_logs/
+*.log
+ev_log*.csv
+gps_rpm_log*.csv
+ev_latest*.csv
+evfeed_*.txt
+evhook_status*.txt
+
+# vendor files must never be added
+MainUI.apk
+decompiled/
+native_work/
+lib*.so
