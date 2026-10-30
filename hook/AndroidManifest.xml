@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.ts.evhook"
+    android:sharedUserId="android.uid.system"
+    android:versionCode="3"
+    android:versionName="2.0">
+
+    <uses-sdk
+        android:minSdkVersion="23"
+        android:targetSdkVersion="28" />
+
+    <application
+        android:allowBackup="false"
+        android:label="EvHook"
+        android:process="com.ts.MainUI">
+        <service
+            android:name=".EvService"
+            android:exported="true"
+            android:process="com.ts.MainUI" />
+        <provider
+            android:name=".EvStarter"
+            android:authorities="com.ts.evhook.starter"
+            android:exported="false"
+            android:process="com.ts.MainUI" />
+    </application>
+</manifest>
