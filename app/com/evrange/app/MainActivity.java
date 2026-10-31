@@ -143,9 +143,9 @@ public class MainActivity extends Activity implements DashView.Listener {
         double s3000 = num(speed3000, 0);
         double realKm = num(known, 0);
         if (s3000 > 5 && s3000 < 120) {
-            ed.putLong("kmrev", Double.doubleToLongBits(s3000 / (3000.0 * 60.0)));
+            ed.putLong("kmrev2", Double.doubleToLongBits(s3000 / (3000.0 * 60.0)));
         } else if (realKm > 0.2 && e.tripRevs() > 100) {
-            ed.putLong("kmrev", Double.doubleToLongBits(realKm / e.tripRevs()));
+            ed.putLong("kmrev2", Double.doubleToLongBits(realKm / e.tripRevs()));
         }
         ed.apply();
         Core.applyConfig();

@@ -27,9 +27,23 @@ New-Item -ItemType Directory -Force "$Build\engine", "$Build\feed", "$Build\feed
 if ($LASTEXITCODE -ne 0) { throw "engine tests did not compile" }
 $out = & $java -cp "$Build\engine" EngineTest "$Root\samples\ev_demo_sanitized.csv" 0 | Out-String
 $m = [regex]::Match($out, "trip: ([\d.]+) km, ([\d.]+) kWh/100")
-Check "engine: sample drive distance is about 3.2 km" ($m.Success -and [math]::Abs([double]$m.Groups[1].Value - 3.22) -lt 0.1)
-Check "engine: sample drive consumption is about 12.9 kWh/100 km" ($m.Success -and [math]::Abs([double]$m.Groups[2].Value - 12.9) -lt 0.4)
+Check "engine: sample drive distance is about 2.63 km (calibrated 31.0 km/h at 3000 rpm)" ($m.Success -and [math]::Abs([double]$m.Groups[1].Value - 2.63) -lt 0.08)
+Check "engine: sample drive consumption is about 15.8 kWh/100 km" ($m.Success -and [math]::Abs([double]$m.Groups[2].Value - 15.8) -lt 0.5)
 Check "engine: save/load round trip is identical" ($out -match "round trip identical: true")
+
+# 1b. power bar scale
+& $javac --release 8 -Xlint:-options -d "$Build\engine" "$Root\app\com\evrange\app\PowerScale.java" "$Root\app\test\PowerScaleTest.java"
+if ($LASTEXITCODE -ne 0) { throw "power scale tests did not compile" }
+$out = & $java -cp "$Build\engine" PowerScaleTest | Out-String
+Check "power bar: scale and thresholds" ($out -match "ALL POWER SCALE TESTS PASSED")
+if ($out -notmatch "ALL POWER SCALE TESTS PASSED") { $out }
+
+# 1c. speed from rpm / GPS
+& $javac --release 8 -Xlint:-options -d "$Build\engine" "$Root\app\com\evrange\app\RangeEngine.java" "$Root\app\test\SpeedTest.java"
+if ($LASTEXITCODE -ne 0) { throw "speed tests did not compile" }
+$out = & $java -cp "$Build\engine" SpeedTest | Out-String
+Check "speed: rpm conversion, GPS preference, stopped detection" ($out -match "ALL SPEED TESTS PASSED")
+if ($out -notmatch "ALL SPEED TESTS PASSED") { $out }
 
 # 2. data feed safety brakes, against a fake car library
 & $javac --release 8 -Xlint:-options -d "$Build\feed" "$Root\hook\com\ts\evhook\EvFeedCore.java" "$Root\hook\test\com\lgb\canmodule\CanDataInfo.java" "$Root\hook\test\com\lgb\canmodule\CanJni.java" "$Root\hook\test\FeedTest.java"

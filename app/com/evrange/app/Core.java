@@ -57,6 +57,11 @@ public final class Core {
         return gps != null && gps.hasFix();
     }
 
+    /** Fresh GPS speed in km/h, or -1. */
+    public static double gpsKmh() {
+        return gps == null ? -1 : gps.currentKmh();
+    }
+
     public static SharedPreferences prefs() {
         return prefs;
     }
@@ -77,6 +82,12 @@ public final class Core {
         }
         if (!running) {
             running = true;
+            // History version 2: distances before the rpm calibration used a 22 % too long ratio. Drop the
+            // saved history once and rebuild it from the log with the calibrated ratio.
+            if (!demo && prefs.getInt("histver", 0) < 2) {
+                stateFile().delete();
+                prefs.edit().putLong("pos", 0).putInt("histver", 2).apply();
+            }
             applyConfig();
             loadState();
             reader = new LogReader(demo ? DEMO_PATH : LIVE_PATH, demo ? 0 : prefs.getLong("pos", 0));
@@ -93,7 +104,8 @@ public final class Core {
         engine.capacityKwh = Double.longBitsToDouble(prefs.getLong("cap", Double.doubleToLongBits(19.0)));
         engine.wltpKm = Double.longBitsToDouble(prefs.getLong("wltp", Double.doubleToLongBits(220.0)));
         engine.reserveKm = Double.longBitsToDouble(prefs.getLong("reserve", Double.doubleToLongBits(15.0)));
-        engine.kmPerMotorRev = Double.longBitsToDouble(prefs.getLong("kmrev", Double.doubleToLongBits(0.000211)));
+        // key "kmrev2": the old "kmrev" held the uncalibrated 0.000211 default and is ignored
+        engine.kmPerMotorRev = Double.longBitsToDouble(prefs.getLong("kmrev2", Double.doubleToLongBits(0.0001722)));
         engine.windowKm = prefs.getInt("window", 25);
     }
 

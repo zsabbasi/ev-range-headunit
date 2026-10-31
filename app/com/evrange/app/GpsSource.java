@@ -64,6 +64,14 @@ public final class GpsSource implements LocationListener {
         return new Fix(speedMs, altM, accM);
     }
 
+    /** Latest GPS speed in km/h, or -1 if there is no fresh fix. */
+    public double currentKmh() {
+        if (System.currentTimeMillis() - fixAtMs > 5000 || speedMs < 0) {
+            return -1;
+        }
+        return speedMs * 3.6;
+    }
+
     public boolean hasFix() {
         return System.currentTimeMillis() - fixAtMs < 6000;
     }

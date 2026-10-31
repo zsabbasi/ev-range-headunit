@@ -156,21 +156,39 @@ public final class DashView extends View {
         text(c, Double.isNaN(wltp) ? "not set" : f0(wltp) + " km", 990, y, 28,
                 Double.isNaN(wltp) ? MUTED : TEXT, Paint.Align.RIGHT, true);
 
-        // ---- live power bar (-30 kW regen ... +40 kW) ----
+        // ---- live power bar: scale from the measured limits plus an allowance (see PowerScale) ----
         panel(c, 16, 342, 1008, 414);
         double kw = e.liveKw();
-        float x0 = 220, x1 = 960, zero = x0 + (x1 - x0) * 30f / 70f;
+        float x0 = 220, x1 = 790, w = x1 - x0;
+        float zero = x0 + w * (float) PowerScale.zeroFraction();
         p.setStyle(Paint.Style.FILL);
         p.setColor(0xFF2A3A4D);
         r.set(x0, 366, x1, 392);
         c.drawRoundRect(r, 8, 8, p);
-        float v = (float) Math.max(-30, Math.min(40, kw));
-        float xv = zero + (x1 - x0) * v / 70f;
-        p.setColor(kw < 0 ? GREEN : kw > 25 ? RED : AMBER);
+        float xv = x0 + w * (float) PowerScale.fraction(kw);
+        int lvl = PowerScale.level(kw);
+        p.setColor(lvl == PowerScale.REGEN ? GREEN : lvl == PowerScale.HIGH ? RED : AMBER);
         r.set(Math.min(zero, xv), 366, Math.max(zero, xv), 392);
         c.drawRect(r, p);
+        // thin ticks at the limits actually measured on this car (the bar extends past them by the allowance)
+        p.setColor(0xFF8DA2B8);
+        float tD = x0 + w * (float) PowerScale.fraction(PowerScale.PEAK_DISCHARGE_KW);
+        float tR = x0 + w * (float) PowerScale.fraction(-PowerScale.PEAK_REGEN_KW);
+        c.drawRect(tD - 1, 362, tD + 1, 396, p);
+        c.drawRect(tR - 1, 362, tR + 1, 396, p);
         p.setColor(TEXT);
         c.drawRect(zero - 2, 360, zero + 2, 398, p);
+        text(c, String.format(Locale.US, "%.0f", PowerScale.MIN_KW), x0, 409, 15, MUTED, Paint.Align.LEFT, false);
+        text(c, String.format(Locale.US, "+%.0f kW", PowerScale.MAX_KW), x1, 409, 15, MUTED, Paint.Align.RIGHT, false);
+
+        // speed: a fresh GPS speed if there is one, otherwise motor rpm x the calibrated ratio
+        p.setColor(0xFF2A3A4D);
+        c.drawRect(815, 356, 817, 400, p);
+        double gpsKmh = Core.gpsKmh();
+        boolean viaGps = e.speedUsesGps(gpsKmh);
+        text(c, stale ? "SPEED" : viaGps ? "SPEED (GPS)" : "SPEED (rpm)", 832, 368, 16, MUTED, Paint.Align.LEFT, true);
+        text(c, stale ? "--" : String.format(Locale.US, "%.0f km/h", e.speedKmh(gpsKmh)), 832, 402, 30,
+                stale ? MUTED : TEXT, Paint.Align.LEFT, true);
         text(c, kw < -0.05 ? "REGEN" : "POWER", 36, 368, 18, kw < -0.05 ? GREEN : MUTED, Paint.Align.LEFT, true);
         text(c, f1(Math.abs(kw)) + " kW", 36, 402, 30, TEXT, Paint.Align.LEFT, true);
 

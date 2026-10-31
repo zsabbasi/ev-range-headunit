@@ -29,7 +29,8 @@ public final class RangeEngine {
     public double capacityKwh = 19.0;
     public double wltpKm = 0.0;
     public double reserveKm = 15.0;
-    public double kmPerMotorRev = 0.000211; // uncalibrated default (wheel 1.9 m / ratio 9)
+    /** Calibrated against GPS: 31.0 km/h at 3000 motor rpm (R2 0.987 over 658 samples, flat across speed bands). */
+    public double kmPerMotorRev = 0.0001722;
     public double defaultKwhPer100 = 14.0;
     public double windowKm = 25.0;
     public double minWindowKm = 1.0;
@@ -213,6 +214,35 @@ public final class RangeEngine {
 
     public double wltpRangeKm() {
         return wltpKm > 0 ? wltpKm * soc / 100.0 : Double.NaN;
+    }
+
+    /**
+     * Current vehicle speed in km/h. The motor is geared to the wheels with no clutch, so rpm = 0 means
+     * stopped. Otherwise a fresh GPS speed is preferred; without one the rpm is converted with the
+     * calibrated ratio.
+     *
+     * @param gpsKmh fresh GPS speed in km/h, or a negative number if there is no fix
+     */
+    public double speedKmh(double gpsKmh) {
+        double rpm = Math.abs(lastRpm);
+        if (rpm < DEADBAND_RPM) {
+            return 0.0;
+        }
+        return speedUsesGps(gpsKmh) ? gpsKmh : rpm * kmPerMotorRev * 60.0;
+    }
+
+    /**
+     * True when a fresh GPS speed is used: it must agree with the rpm-derived speed (within 20 % or 5 km/h,
+     * whichever is larger). While the car rolls the motor is geared to the wheels, so a GPS value that
+     * contradicts the rpm is a GPS glitch and is ignored.
+     */
+    public boolean speedUsesGps(double gpsKmh) {
+        double rpm = Math.abs(lastRpm);
+        if (gpsKmh < 0 || rpm < DEADBAND_RPM) {
+            return false;
+        }
+        double fromRpm = rpm * kmPerMotorRev * 60.0;
+        return Math.abs(gpsKmh - fromRpm) <= Math.max(5.0, 0.20 * fromRpm);
     }
 
     public double liveKw() {
