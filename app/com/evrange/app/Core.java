@@ -130,6 +130,7 @@ public final class Core {
         // key "kmrev2": the old "kmrev" held the uncalibrated 0.000211 default and is ignored
         engine.kmPerMotorRev = Double.longBitsToDouble(prefs.getLong("kmrev2", Double.doubleToLongBits(0.0001722)));
         engine.windowKm = prefs.getInt("window", 25);
+        engine.speedSource = prefs.getInt("speedsrc", RangeEngine.SRC_RPM);
     }
 
     private static File stateFile() {

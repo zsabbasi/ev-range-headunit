@@ -14,6 +14,7 @@ import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import java.util.Locale;
 
@@ -118,7 +119,10 @@ public class MainActivity extends Activity implements DashView.Listener {
         demoBox.setText("Demo mode (replay recorded drive from ev_demo.csv)");
         demoBox.setChecked(Core.isDemo());
         box.addView(demoBox);
-        new AlertDialog.Builder(this).setTitle("Settings").setView(box)
+        // the dialog is taller than the 720 px screen: it must scroll to reach the speed source and demo options
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(box);
+        new AlertDialog.Builder(this).setTitle("Settings").setView(scroll)
                 .setPositiveButton("Save", new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int w) {
