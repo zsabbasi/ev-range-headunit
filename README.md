@@ -13,6 +13,7 @@ A real-world range estimate for one specific small EV, computed from **what you 
 |---|---|
 | `app/` | **EV Range app**: the screen (range, kWh/100 km, trip / day / all-time averages, 7-day chart, a live power bar scaled to this car's measured limits, speed, rated-range comparison). A normal Android app in its own process. |
 | `hook/` | **Data feed** (`com.ts.evhook`): reads battery voltage, current, SOC, temperatures and motor rpm from the car through the head unit's own software and writes a small CSV. Runs inside `com.ts.MainUI`. Has built-in safety brakes. |
+| `probe/` | **Read-only probe** (`com.evprobe.app`, no permissions): shows the unit's own car-info values live (gear, brake, hand brake, ACC, tyre pressure fields, a distance counter, ...) and highlights what changes, to find out what this car actually sends. Calls only the read method of the unit's car-info interface. Never logs the VIN. |
 | `tools/` | Analysis scripts, including `calibrate_speed.py` (rpm vs GPS speed) and `vehicle_off_monitor.ps1`. |
 | `samples/` | A sanitized sample drive for demo mode and tests. |
 | `docs/` | The development log, the TPMS findings, and the install / safety / build guides. |
@@ -53,6 +54,7 @@ On anything else the hook may not install, may do nothing, or may behave unpredi
 .\scripts\test.ps1          # tests, no device needed
 .\app\build.ps1             # build\app\evrange.apk   (debug-signed; use your own key to distribute)
 .\hook\build.ps1            # build\hook\evhook.apk   (AOSP platform key: see docs/BUILD.md)
+.\probe\build.ps1           # build\probe\evprobe.apk (read-only, no permissions)
 ```
 
 Then follow [docs/INSTALL.md](docs/INSTALL.md) step by step (it verifies checksums at each step and explains how to undo everything).

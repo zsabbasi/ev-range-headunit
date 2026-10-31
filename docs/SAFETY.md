@@ -41,3 +41,11 @@ A tripped feed stays off until `evfeed.tripped` is deleted.
 4. If anything reloads, freezes or misbehaves: create `evfeed.disable`, or uninstall `com.ts.evhook`.
 5. The data feed package is signed with the **public** Android test platform key and uses the system user ID. That is what lets it run inside the unit's program; it is also why it must never be offered as a general app or to other devices.
 6. Never publish raw logs, crash dumps or screenshots from your own unit without removing network names, addresses and location data.
+
+## The unit itself accepts commands from any app
+
+The head unit's car-info service (`com.ts.can.carinfo.CarInfoService`, inside `com.ts.MainUI`) is declared **exported with no permission**. Besides read methods it offers `SendCmd`, `UartCanSend` and the serial-port calls, so **any app installed on the unit can send commands to the car's CAN bus**. This is a weakness of the unit, not of this project. What follows from it:
+
+- Do not install apps from unknown sources on this unit.
+- The probe in this repository is read-only: it requests no permissions and calls only `requestCarBaseInfo()` (transaction 6). It never calls the command or serial methods, and it neither shows nor logs the vehicle identification number.
+- The app and the data feed never send anything to the car.
