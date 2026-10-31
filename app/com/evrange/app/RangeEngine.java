@@ -52,6 +52,9 @@ public final class RangeEngine {
     private double tripRevs;
     private double allKm;
     private double allNet;
+    /** Distance and net energy per drive mode (index 0 = D, 1 = S), for samples taken while the mode was known. */
+    private final double[] modeKm = new double[2];
+    private final double[] modeNet = new double[2];
     private final TreeMap<Long, Day> days = new TreeMap<Long, Day>();
 
     /** Clears everything (used when switching data source or starting demo mode). */
@@ -67,6 +70,8 @@ public final class RangeEngine {
         lastRpm = 0;
         allKm = 0;
         allNet = 0;
+        modeKm[0] = modeKm[1] = 0;
+        modeNet[0] = modeNet[1] = 0;
         resetTrip();
     }
 
@@ -83,8 +88,13 @@ public final class RangeEngine {
         return x >= 0 ? x / 86400000L : -((-x + 86399999L) / 86400000L);
     }
 
-    /** gpsSpeedMs: vehicle speed in m/s from GPS, or negative if unavailable. */
+    /** gpsSpeedMs: vehicle speed in m/s from GPS, or negative if unavailable. Drive mode unknown. */
     public void addSample(long tMs, int volt, int amp, int socPct, int rpm, double gpsSpeedMs) {
+        addSample(tMs, volt, amp, socPct, rpm, gpsSpeedMs, -1);
+    }
+
+    /** As above, with the drive mode known at the time of the sample: 0 = D, 1 = S, anything else unknown. */
+    public void addSample(long tMs, int volt, int amp, int socPct, int rpm, double gpsSpeedMs, int mode) {
         soc = socPct;
         lastRpm = rpm;
         double kwNow = volt * (double) amp / 1000.0;
@@ -105,6 +115,10 @@ public final class RangeEngine {
                 }
                 allKm += km;
                 allNet += kwh;
+                if (mode == 0 || mode == 1) {
+                    modeKm[mode] += km;
+                    modeNet[mode] += kwh;
+                }
                 Long key = Long.valueOf(dayIndex(tMs));
                 Day d = days.get(key);
                 if (d == null) {
@@ -290,6 +304,15 @@ public final class RangeEngine {
         return dayIndex(System.currentTimeMillis());
     }
 
+    /** kWh/100 km in drive mode 0 (D) or 1 (S), NaN until at least a kilometre has been driven in it. */
+    public double modeKwhPer100(int mode) {
+        return (mode != 0 && mode != 1) || modeKm[mode] < minWindowKm ? Double.NaN : modeNet[mode] / modeKm[mode] * 100.0;
+    }
+
+    public double modeKm(int mode) {
+        return mode == 0 || mode == 1 ? modeKm[mode] : 0.0;
+    }
+
     // ---- persistence ----
     public String save() {
         StringBuilder sb = new StringBuilder();
@@ -297,6 +320,8 @@ public final class RangeEngine {
                 .append(tripNet).append(',').append(tripRegen).append(',').append(tripRevs).append(',')
                 .append(allKm).append(',').append(allNet).append(',').append(curKm).append(',')
                 .append(curKwh).append('\n');
+        sb.append("k,").append(modeKm[0]).append(',').append(modeNet[0]).append(',').append(modeKm[1]).append(',')
+                .append(modeNet[1]).append('\n');
         for (double[] b : window) {
             sb.append("w,").append(b[0]).append(',').append(b[1]).append('\n');
         }
@@ -311,6 +336,8 @@ public final class RangeEngine {
     public void load(String text) {
         window.clear();
         days.clear();
+        modeKm[0] = modeKm[1] = 0;
+        modeNet[0] = modeNet[1] = 0;
         for (String line : text.split("\n")) {
             String[] c = line.split(",");
             try {
@@ -325,6 +352,11 @@ public final class RangeEngine {
                     allNet = Double.parseDouble(c[8]);
                     curKm = Double.parseDouble(c[9]);
                     curKwh = Double.parseDouble(c[10]);
+                } else if (c[0].equals("k") && c.length >= 5) {
+                    modeKm[0] = Double.parseDouble(c[1]);
+                    modeNet[0] = Double.parseDouble(c[2]);
+                    modeKm[1] = Double.parseDouble(c[3]);
+                    modeNet[1] = Double.parseDouble(c[4]);
                 } else if (c[0].equals("w") && c.length >= 3) {
                     window.addLast(new double[] {Double.parseDouble(c[1]), Double.parseDouble(c[2])});
                 } else if (c[0].equals("d") && c.length >= 5) {

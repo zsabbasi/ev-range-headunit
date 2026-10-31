@@ -134,9 +134,18 @@ public final class DashView extends View {
         text(c, "Battery", 540, y, 24, MUTED, Paint.Align.LEFT, false);
         text(c, e.soc() + " %   " + f1(e.remainingKwh()) + " kWh", 990, y, 28, TEXT, Paint.Align.RIGHT, true);
         y += 40;
-        text(c, "Efficiency now", 540, y, 24, MUTED, Paint.Align.LEFT, false);
-        double kmPerKwh = 100.0 / e.bestKwhPer100();
-        text(c, f1(kmPerKwh) + " km/kWh", 990, y, 28, TEXT, Paint.Align.RIGHT, true);
+        // consumption by drive mode once both have at least a kilometre, otherwise km/kWh
+        double dCons = e.modeKwhPer100(CarRange.MODE_D);
+        double sCons = e.modeKwhPer100(CarRange.MODE_S);
+        if (!Double.isNaN(dCons) || !Double.isNaN(sCons)) {
+            text(c, "By mode (D / S)", 540, y, 24, MUTED, Paint.Align.LEFT, false);
+            text(c, (Double.isNaN(dCons) ? "--" : f1(dCons)) + "  /  " + (Double.isNaN(sCons) ? "--" : f1(sCons))
+                    + " kWh/100", 990, y, 28, TEXT, Paint.Align.RIGHT, true);
+        } else {
+            text(c, "Efficiency now", 540, y, 24, MUTED, Paint.Align.LEFT, false);
+            double kmPerKwh = 100.0 / e.bestKwhPer100();
+            text(c, f1(kmPerKwh) + " km/kWh", 990, y, 28, TEXT, Paint.Align.RIGHT, true);
+        }
         y += 40;
         text(c, "This trip", 540, y, 24, MUTED, Paint.Align.LEFT, false);
         text(c, f1(e.tripKm()) + " km   " + f1(e.tripKwhPer100()) + " kWh/100", 990, y, 28, TEXT,
@@ -151,10 +160,17 @@ public final class DashView extends View {
         text(c, "All time", 540, y, 24, MUTED, Paint.Align.LEFT, false);
         text(c, f1(e.allTimeKwhPer100()) + " kWh/100", 990, y, 28, TEXT, Paint.Align.RIGHT, true);
         y += 40;
-        double wltp = e.wltpRangeKm();
-        text(c, "NEDC-based (car display)", 540, y, 24, MUTED, Paint.Align.LEFT, false);
-        text(c, Double.isNaN(wltp) ? "not set" : f0(wltp) + " km", 990, y, 28,
-                Double.isNaN(wltp) ? MUTED : TEXT, Paint.Align.RIGHT, true);
+        int carKm = Core.carRangeKm();
+        if (carKm > 0 && !stale) {
+            // the car's own figure, read from the unit; the letter is the drive mode worked out from it
+            text(c, "Car says (" + CarRange.label(Core.driveMode()) + ")", 540, y, 24, MUTED, Paint.Align.LEFT, false);
+            text(c, carKm + " km", 990, y, 28, TEXT, Paint.Align.RIGHT, true);
+        } else {
+            double wltp = e.wltpRangeKm();
+            text(c, "NEDC-based (car display)", 540, y, 24, MUTED, Paint.Align.LEFT, false);
+            text(c, Double.isNaN(wltp) ? "not set" : f0(wltp) + " km", 990, y, 28,
+                    Double.isNaN(wltp) ? MUTED : TEXT, Paint.Align.RIGHT, true);
+        }
 
         // ---- live power bar: scale from the measured limits plus an allowance (see PowerScale) ----
         panel(c, 16, 342, 1008, 414);

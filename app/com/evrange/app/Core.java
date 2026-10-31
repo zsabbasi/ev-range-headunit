@@ -26,6 +26,10 @@ public final class Core {
     private static SharedPreferences prefs;
     private static LogReader reader;
     private static GpsSource gps;
+    private static CarInfoClient car;
+    private static long lastCarLogMs;
+    private static int lastCarRange = -2;
+    private static int lastCarMode = -2;
     private static Handler handler;
     private static boolean running;
     private static boolean demo;
@@ -55,6 +59,16 @@ public final class Core {
 
     public static boolean gpsFix() {
         return gps != null && gps.hasFix();
+    }
+
+    /** The car's own range in km (live mode only), or -1 if it is not available. */
+    public static int carRangeKm() {
+        return demo || car == null ? -1 : car.rangeKm();
+    }
+
+    /** CarRange.MODE_D, MODE_S or MODE_UNKNOWN, worked out from the car's own range and battery level. */
+    public static int driveMode() {
+        return demo || car == null ? CarRange.MODE_UNKNOWN : car.mode();
     }
 
     /** Fresh GPS speed in km/h, or -1. */
@@ -95,6 +109,10 @@ public final class Core {
                 gps = new GpsSource(app);
             }
             gps.start();
+            if (car == null) {
+                car = new CarInfoClient(app);
+            }
+            car.start();
             handler.removeCallbacks(TICK);
             handler.post(TICK);
         }
@@ -199,8 +217,11 @@ public final class Core {
                 }
                 int rpm = Integer.parseInt(c[9]);
                 GpsSource.Fix fix = demo ? null : gps.fixFor(ms);
+                // the car's drive mode applies only to samples taken just now, not to a backlog read from the log
+                int dm = !demo && car != null && Math.abs(System.currentTimeMillis() - ms) <= 6000
+                        ? car.mode() : CarRange.MODE_UNKNOWN;
                 engine.addSample(ms, Integer.parseInt(c[2]), Integer.parseInt(c[3]), Integer.parseInt(c[4]),
-                        rpm, fix == null ? -1 : fix.speedMs);
+                        rpm, fix == null ? -1 : fix.speedMs, dm);
                 if (fix != null && (Math.abs(rpm) > 20 || fix.speedMs > 0.5)) {
                     cal.append(ms).append(',').append(c[1]).append(',').append(rpm).append(',')
                             .append(String.format(java.util.Locale.US, "%.2f", fix.speedMs * 3.6)).append(',')
@@ -216,11 +237,50 @@ public final class Core {
             appendCalibration(cal.toString());
         }
         long now = System.currentTimeMillis();
+        logCarInfo(now);
         ageSec = engine.lastSampleMs() <= 0 ? 999999 : (now - engine.lastSampleMs()) / 1000;
         stale = !demo && ageSec > STALE_SEC;
         mode = demo ? "DEMO (recorded drive)" : "LIVE";
         if (now - lastSaveMs > 30000) {
             saveState();
+        }
+    }
+
+    /** Records the car's own range and the mode we infer, when they change and at least once a minute. */
+    private static void logCarInfo(long now) {
+        if (demo || car == null) {
+            return;
+        }
+        int r = car.rangeKm();
+        if (r < 0) {
+            return;
+        }
+        int m = car.mode();
+        if (r == lastCarRange && m == lastCarMode && now - lastCarLogMs < 60000) {
+            return;
+        }
+        lastCarRange = r;
+        lastCarMode = m;
+        lastCarLogMs = now;
+        try {
+            File dir = app.getExternalFilesDir(null);
+            if (dir == null) {
+                return;
+            }
+            File f = new File(dir, "carinfo_log.csv");
+            boolean fresh = !f.exists();
+            FileOutputStream out = new FileOutputStream(f, true);
+            try {
+                if (fresh) {
+                    out.write("epoch_ms,range_km,soc_pct,mode,speed_kmh\n".getBytes("UTF-8"));
+                }
+                double v = engine.speedKmh(gps == null ? -1 : gps.currentKmh());
+                out.write((now + "," + r + "," + car.socPct() + "," + CarRange.label(m) + ","
+                        + String.format(java.util.Locale.US, "%.0f", v) + "\n").getBytes("UTF-8"));
+            } finally {
+                out.close();
+            }
+        } catch (Throwable ignored) {
         }
     }
 
