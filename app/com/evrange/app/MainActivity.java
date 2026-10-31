@@ -92,7 +92,7 @@ public class MainActivity extends Activity implements DashView.Listener {
         box.setOrientation(LinearLayout.VERTICAL);
         box.setPadding(40, 20, 40, 10);
         final EditText cap = field(box, "Battery capacity (kWh, usable)", String.valueOf(e.capacityKwh));
-        final EditText rated = field(box, "Rated range (km, NEDC 220; 0 = unknown)", String.valueOf(e.wltpKm));
+        final EditText rated = field(box, "Rated range (km; 240 matches the unit's own screen; 0 = unknown)", String.valueOf(e.wltpKm));
         final EditText reserve = field(box, "Reserve (km)", String.valueOf(e.reserveKm));
         final EditText speed3000 = field(box, String.format(Locale.US,
                 "Speed at 3000 motor rpm (km/h). Now: %.1f km/h", e.kmPerMotorRev * 3000 * 60), "");

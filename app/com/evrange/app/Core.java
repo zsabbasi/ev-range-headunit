@@ -102,7 +102,9 @@ public final class Core {
 
     public static void applyConfig() {
         engine.capacityKwh = Double.longBitsToDouble(prefs.getLong("cap", Double.doubleToLongBits(19.0)));
-        engine.wltpKm = Double.longBitsToDouble(prefs.getLong("wltp", Double.doubleToLongBits(220.0)));
+        // 240 km: the rated range the head unit's own screen shows for this car; the app's "car display"
+        // row is kept consistent with that screen (the figure in some paperwork, 220 km, is not used)
+        engine.wltpKm = Double.longBitsToDouble(prefs.getLong("wltp", Double.doubleToLongBits(240.0)));
         engine.reserveKm = Double.longBitsToDouble(prefs.getLong("reserve", Double.doubleToLongBits(15.0)));
         // key "kmrev2": the old "kmrev" held the uncalibrated 0.000211 default and is ignored
         engine.kmPerMotorRev = Double.longBitsToDouble(prefs.getLong("kmrev2", Double.doubleToLongBits(0.0001722)));
