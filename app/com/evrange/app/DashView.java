@@ -2,8 +2,10 @@ package com.evrange.app;
 
 import android.content.Context;
 import android.graphics.Canvas;
+import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.RectF;
+import android.graphics.Shader;
 import android.graphics.Typeface;
 import android.view.MotionEvent;
 import android.view.View;
@@ -108,6 +110,28 @@ public final class DashView extends View {
         c.scale(s, s);
         drawDash(c);
         c.restore();
+        if (Core.driveMode() == CarRange.MODE_S) {
+            sportGlow(c);
+        }
+    }
+
+    /** A red glow around the screen edges while the car is in S (sport), fading toward the centre. */
+    private void sportGlow(Canvas c) {
+        float w = getWidth();
+        float h = getHeight();
+        float d = Math.min(w, h) * 0.07f;
+        int strong = 0xB0FF3B3B;
+        int none = 0x00FF3B3B;
+        p.setStyle(Paint.Style.FILL);
+        p.setShader(new LinearGradient(0, 0, 0, d, strong, none, Shader.TileMode.CLAMP));
+        c.drawRect(0, 0, w, d, p);
+        p.setShader(new LinearGradient(0, h, 0, h - d, strong, none, Shader.TileMode.CLAMP));
+        c.drawRect(0, h - d, w, h, p);
+        p.setShader(new LinearGradient(0, 0, d, 0, strong, none, Shader.TileMode.CLAMP));
+        c.drawRect(0, 0, d, h, p);
+        p.setShader(new LinearGradient(w, 0, w - d, 0, strong, none, Shader.TileMode.CLAMP));
+        c.drawRect(w - d, 0, w, h, p);
+        p.setShader(null);
     }
 
     private void drawDash(Canvas c) {
