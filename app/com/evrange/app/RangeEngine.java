@@ -26,7 +26,11 @@ public final class RangeEngine {
     private static final double DEADBAND_RPM = 20.0;
 
     // ---- configuration ----
-    public double capacityKwh = 19.0;
+    public double capacityKwh = 19.14;
+
+    /** Where speed and distance come from: AUTO = GPS while it agrees with the motor rpm, RPM = motor rpm only, GPS = GPS when there is a fix. */
+    public static final int SRC_AUTO = 0, SRC_RPM = 1, SRC_GPS = 2;
+    public int speedSource = SRC_AUTO;
     public double wltpKm = 0.0;
     public double reserveKm = 15.0;
     /** Calibrated against GPS: 31.0 km/h at 3000 motor rpm (R2 0.987 over 658 samples, flat across speed bands). */
@@ -109,7 +113,7 @@ public final class RangeEngine {
                     kwh = 0; // energy flowing in while standing still is charging, not regen: not driving consumption
                 }
                 double revs = (lastAbsRpm + absRpmNow) / 2.0 * dt / 60000.0;
-                double km = gpsSpeedMs >= 0 ? gpsSpeedMs * dt / 1e6 : revs * kmPerMotorRev;
+                double km = gpsSpeedMs >= 0 && speedSource != SRC_RPM ? gpsSpeedMs * dt / 1e6 : revs * kmPerMotorRev;
                 tripKm += km;
                 tripNet += kwh;
                 tripRevs += revs;
@@ -255,8 +259,11 @@ public final class RangeEngine {
      */
     public boolean speedUsesGps(double gpsKmh) {
         double rpm = Math.abs(lastRpm);
-        if (gpsKmh < 0 || rpm < DEADBAND_RPM) {
+        if (gpsKmh < 0 || rpm < DEADBAND_RPM || speedSource == SRC_RPM) {
             return false;
+        }
+        if (speedSource == SRC_GPS) {
+            return true;
         }
         double fromRpm = rpm * kmPerMotorRev * 60.0;
         return Math.abs(gpsKmh - fromRpm) <= Math.max(5.0, 0.20 * fromRpm);

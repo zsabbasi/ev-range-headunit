@@ -119,7 +119,10 @@ public final class Core {
     }
 
     public static void applyConfig() {
-        engine.capacityKwh = Double.longBitsToDouble(prefs.getLong("cap", Double.doubleToLongBits(19.0)));
+        // 19.14 kWh is this car's pack; a saved 19.0 is the old default, not a choice, and is replaced
+        double cap = Double.longBitsToDouble(prefs.getLong("cap", Double.doubleToLongBits(19.14)));
+        engine.capacityKwh = Math.abs(cap - 19.0) < 1e-9 ? 19.14 : cap;
+        // motor rpm is the default speed source: it reacts faster than GPS, which lags
         // 240 km: the rated range the head unit's own screen shows for this car; the app's "car display"
         // row is kept consistent with that screen (the figure in some paperwork, 220 km, is not used)
         engine.wltpKm = Double.longBitsToDouble(prefs.getLong("wltp", Double.doubleToLongBits(240.0)));

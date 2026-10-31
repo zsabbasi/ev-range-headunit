@@ -24,14 +24,16 @@ public final class DashView extends View {
         void onNewTrip();
     }
 
-    private static final int BG = 0xFF0E1621;
-    private static final int PANEL = 0xFF182331;
-    private static final int TEXT = 0xFFEAF0F7;
-    private static final int MUTED = 0xFF8DA2B8;
+    private static final int BG = 0xFF070D14;
+    private static final int PANEL = 0xFF1B2A3B;
+    private static final int TEXT = 0xFFFFFFFF;
+    private static final int MUTED = 0xFFD0DBE8;
     private static final int GREEN = 0xFF3DDC84;
     private static final int AMBER = 0xFFFFB84D;
     private static final int RED = 0xFFFF5C5C;
     private static final int BLUE = 0xFF4DA3FF;
+    /** Bar track, divider and unselected buttons: light enough to see in direct sun. */
+    private static final int TRACK = 0xFF3A506A;
 
     private static final int[] WINDOWS = {10, 25, 50};
 
@@ -93,7 +95,7 @@ public final class DashView extends View {
 
     private void button(Canvas c, RectF b, String label, boolean selected) {
         p.setStyle(Paint.Style.FILL);
-        p.setColor(selected ? BLUE : 0xFF2A3A4D);
+        p.setColor(selected ? BLUE : TRACK);
         c.drawRoundRect(b, 10, 10, p);
         text(c, label, b.centerX(), b.centerY() + 8, 22, selected ? 0xFF06121F : TEXT, Paint.Align.CENTER, true);
     }
@@ -143,13 +145,13 @@ public final class DashView extends View {
         String gps = gpsOk ? "GPS" : "no GPS";
         String statusText = mode + (stale ? "  -  NO RECENT DATA (" + dataAgeSec + " s)" : "");
         text(c, "EV RANGE", 24, 38, 26, MUTED, Paint.Align.LEFT, true);
-        text(c, statusText + "   |   " + gps, 1000, 38, 22, stale ? AMBER : MUTED, Paint.Align.RIGHT, false);
+        text(c, statusText + "   |   " + gps, 1000, 38, 24, stale ? AMBER : MUTED, Paint.Align.RIGHT, false);
 
         // ---- main range panel ----
         panel(c, 16, 54, 500, 330);
         text(c, f0(range), 250, 215, 170, rangeColor, Paint.Align.CENTER, true);
         text(c, "km range", 250, 255, 30, TEXT, Paint.Align.CENTER, false);
-        text(c, "based on " + e.bestSource(), 250, 290, 22, MUTED, Paint.Align.CENTER, false);
+        text(c, "based on " + e.bestSource(), 250, 290, 24, MUTED, Paint.Align.CENTER, false);
         text(c, f1(e.bestKwhPer100()) + " kWh/100 km", 250, 320, 24, TEXT, Paint.Align.CENTER, true);
 
         // ---- key figures ----
@@ -202,7 +204,7 @@ public final class DashView extends View {
         float x0 = 220, x1 = 790, w = x1 - x0;
         float zero = x0 + w * (float) PowerScale.zeroFraction();
         p.setStyle(Paint.Style.FILL);
-        p.setColor(0xFF2A3A4D);
+        p.setColor(TRACK);
         r.set(x0, 366, x1, 392);
         c.drawRoundRect(r, 8, 8, p);
         float xv = x0 + w * (float) PowerScale.fraction(kw);
@@ -212,31 +214,31 @@ public final class DashView extends View {
         r.set(Math.min(zero, xv), 366, Math.max(zero, xv), 392);
         c.drawRect(r, p);
         // thin ticks at the limits actually measured on this car (the bar extends past them by the allowance)
-        p.setColor(0xFF8DA2B8);
+        p.setColor(MUTED);
         float tD = x0 + w * (float) PowerScale.fraction(PowerScale.PEAK_DISCHARGE_KW);
         float tR = x0 + w * (float) PowerScale.fraction(-PowerScale.PEAK_REGEN_KW);
         c.drawRect(tD - 1, 362, tD + 1, 396, p);
         c.drawRect(tR - 1, 362, tR + 1, 396, p);
         p.setColor(TEXT);
         c.drawRect(zero - 2, 360, zero + 2, 398, p);
-        text(c, String.format(Locale.US, "%.0f", PowerScale.MIN_KW), x0, 409, 15, MUTED, Paint.Align.LEFT, false);
-        text(c, String.format(Locale.US, "+%.0f kW", PowerScale.MAX_KW), x1, 409, 15, MUTED, Paint.Align.RIGHT, false);
+        text(c, String.format(Locale.US, "%.0f", PowerScale.MIN_KW), x0, 409, 19, MUTED, Paint.Align.LEFT, false);
+        text(c, String.format(Locale.US, "+%.0f kW", PowerScale.MAX_KW), x1, 409, 19, MUTED, Paint.Align.RIGHT, false);
 
         // speed: a fresh GPS speed if there is one, otherwise motor rpm x the calibrated ratio
-        p.setColor(0xFF2A3A4D);
+        p.setColor(TRACK);
         c.drawRect(815, 356, 817, 400, p);
         double gpsKmh = Core.gpsKmh();
         boolean viaGps = e.speedUsesGps(gpsKmh);
-        text(c, stale ? "SPEED" : viaGps ? "SPEED (GPS)" : "SPEED (rpm)", 832, 368, 16, MUTED, Paint.Align.LEFT, true);
+        text(c, stale ? "SPEED" : viaGps ? "SPEED (GPS)" : "SPEED (rpm)", 832, 368, 19, MUTED, Paint.Align.LEFT, true);
         text(c, stale ? "--" : String.format(Locale.US, "%.0f km/h", e.speedKmh(gpsKmh)), 832, 402, 30,
                 stale ? MUTED : TEXT, Paint.Align.LEFT, true);
-        text(c, charging ? "CHARGING" : kw < -0.05 ? "REGEN" : "POWER", 36, 368, 18,
+        text(c, charging ? "CHARGING" : kw < -0.05 ? "REGEN" : "POWER", 36, 368, 20,
                 charging ? BLUE : kw < -0.05 ? GREEN : MUTED, Paint.Align.LEFT, true);
         text(c, f1(Math.abs(kw)) + " kW", 36, 402, 30, TEXT, Paint.Align.LEFT, true);
 
         // ---- last 7 days chart ----
         panel(c, 16, 424, 540, 590);
-        text(c, "Last 7 days, kWh/100 km", 32, 450, 20, MUTED, Paint.Align.LEFT, false);
+        text(c, "Last 7 days, kWh/100 km", 32, 450, 22, MUTED, Paint.Align.LEFT, false);
         long today0 = RangeEngine.todayIndex();
         float bx = 40, bw = 56, base = 572, maxH = 90, scaleMax = 25f;
         SimpleDateFormat dayFmt = new SimpleDateFormat("EEE", Locale.US);
@@ -254,12 +256,12 @@ public final class DashView extends View {
                 c.drawRoundRect(r, 6, 6, p);
                 text(c, f1(val), cx + bw / 2, base - h - 24, 17, TEXT, Paint.Align.CENTER, true);
             }
-            text(c, dayFmt.format(new Date(RangeEngine.dayStartMs(idx) + 3600000L)), cx + bw / 2, base, 17, MUTED,
+            text(c, dayFmt.format(new Date(RangeEngine.dayStartMs(idx) + 3600000L)), cx + bw / 2, base, 20, MUTED,
                     Paint.Align.CENTER, false);
         }
 
         // ---- buttons ----
-        text(c, "Estimate from last", 560, 495, 20, MUTED, Paint.Align.LEFT, false);
+        text(c, "Estimate from last", 560, 495, 22, MUTED, Paint.Align.LEFT, false);
         for (int i = 0; i < WINDOWS.length; i++) {
             button(c, winBtn[i], WINDOWS[i] + " km", Math.round(e.windowKm) == WINDOWS[i]);
         }

@@ -12,6 +12,8 @@ import android.text.InputType;
 import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
 import android.widget.TextView;
 import java.util.Locale;
 
@@ -91,13 +93,27 @@ public class MainActivity extends Activity implements DashView.Listener {
         final LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setPadding(40, 20, 40, 10);
-        final EditText cap = field(box, "Battery capacity (kWh, usable)", String.valueOf(e.capacityKwh));
+        final EditText cap = field(box, "Battery capacity (kWh; 19.14 is this car)", String.valueOf(e.capacityKwh));
         final EditText rated = field(box, "Rated range (km; 240 matches the unit's own screen; 0 = unknown)", String.valueOf(e.wltpKm));
         final EditText reserve = field(box, "Reserve (km)", String.valueOf(e.reserveKm));
         final EditText speed3000 = field(box, String.format(Locale.US,
                 "Speed at 3000 motor rpm (km/h). Now: %.1f km/h", e.kmPerMotorRev * 3000 * 60), "");
         final EditText known = field(box, String.format(Locale.US,
                 "Or calibrate: real km of this trip (%.1f km counted, %.0f motor revs)", e.tripKm(), e.tripRevs()), "");
+        TextView srcLabel = new TextView(this);
+        srcLabel.setText("Speed and distance from");
+        box.addView(srcLabel);
+        final RadioGroup srcGroup = new RadioGroup(this);
+        String[] srcNames = {"Auto (GPS while it agrees with rpm)", "Motor rpm (reacts fastest)", "GPS (lags a little)"};
+        int[] srcIds = {RangeEngine.SRC_AUTO, RangeEngine.SRC_RPM, RangeEngine.SRC_GPS};
+        for (int i = 0; i < srcNames.length; i++) {
+            RadioButton rb = new RadioButton(this);
+            rb.setId(100 + srcIds[i]);
+            rb.setText(srcNames[i]);
+            srcGroup.addView(rb);
+        }
+        srcGroup.check(100 + e.speedSource);
+        box.addView(srcGroup);
         final CheckBox demoBox = new CheckBox(this);
         demoBox.setText("Demo mode (replay recorded drive from ev_demo.csv)");
         demoBox.setChecked(Core.isDemo());
@@ -106,7 +122,7 @@ public class MainActivity extends Activity implements DashView.Listener {
                 .setPositiveButton("Save", new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int w) {
-                        saveSettings(cap, rated, reserve, speed3000, known, demoBox.isChecked());
+                        saveSettings(cap, rated, reserve, speed3000, known, srcGroup.getCheckedRadioButtonId() - 100, demoBox.isChecked());
                     }
                 }).setNegativeButton("Cancel", null).show();
     }
@@ -131,12 +147,15 @@ public class MainActivity extends Activity implements DashView.Listener {
     }
 
     private void saveSettings(EditText cap, EditText rated, EditText reserve, EditText speed3000,
-            EditText known, boolean demoOn) {
+            EditText known, int speedSource, boolean demoOn) {
         RangeEngine e = Core.engine;
         SharedPreferences.Editor ed = Core.prefs().edit();
         double c = num(cap, e.capacityKwh);
         if (c > 1 && c < 200) {
             ed.putLong("cap", Double.doubleToLongBits(c));
+        }
+        if (speedSource >= RangeEngine.SRC_AUTO && speedSource <= RangeEngine.SRC_GPS) {
+            ed.putInt("speedsrc", speedSource);
         }
         ed.putLong("wltp", Double.doubleToLongBits(Math.max(0, num(rated, e.wltpKm))));
         ed.putLong("reserve", Double.doubleToLongBits(Math.max(0, num(reserve, e.reserveKm))));
