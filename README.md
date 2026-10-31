@@ -79,4 +79,4 @@ The manufacturer's own files (`MainUI.apk`, its native libraries, decompiled cod
 
 ## License
 
-Not chosen yet. Until a license file is added, all rights are reserved by the author.
+Apache License 2.0, see [LICENSE](LICENSE). The software comes with no warranty; read [docs/SAFETY.md](docs/SAFETY.md) before installing anything on a car.
