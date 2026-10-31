@@ -5,9 +5,9 @@ A real-world range estimate for one specific small EV, computed from **what you 
 > **Experimental hobby project. Read [docs/SAFETY.md](docs/SAFETY.md) before installing anything.**
 > One part of it runs inside the head unit's main program and crashed it repeatedly during development before it was redesigned. It is **not** a safety system. Never rely on it alone for range planning.
 
-![Cruising at 55 km/h and 17 kW (demo mode, recorded sample drive)](docs/images/app_cruise.png)
+![Live screen: range, usage stats, the car's own range, power and speed](docs/images/app_live_driving.png)
 
-![Live screen](docs/images/app_live.png)
+*Screenshot from the car's head unit. The power (17.1 kW) and speed (55 km/h) strip is taken from a recorded sample drive, because the car was parked when the picture was taken; everything else is live.*
 
 ## What is in here
 
