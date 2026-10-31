@@ -207,7 +207,8 @@ public final class DashView extends View {
         c.drawRoundRect(r, 8, 8, p);
         float xv = x0 + w * (float) PowerScale.fraction(kw);
         int lvl = PowerScale.level(kw);
-        p.setColor(lvl == PowerScale.REGEN ? GREEN : lvl == PowerScale.HIGH ? RED : AMBER);
+        boolean charging = !stale && e.charging();
+        p.setColor(charging ? BLUE : lvl == PowerScale.REGEN ? GREEN : lvl == PowerScale.HIGH ? RED : AMBER);
         r.set(Math.min(zero, xv), 366, Math.max(zero, xv), 392);
         c.drawRect(r, p);
         // thin ticks at the limits actually measured on this car (the bar extends past them by the allowance)
@@ -229,7 +230,8 @@ public final class DashView extends View {
         text(c, stale ? "SPEED" : viaGps ? "SPEED (GPS)" : "SPEED (rpm)", 832, 368, 16, MUTED, Paint.Align.LEFT, true);
         text(c, stale ? "--" : String.format(Locale.US, "%.0f km/h", e.speedKmh(gpsKmh)), 832, 402, 30,
                 stale ? MUTED : TEXT, Paint.Align.LEFT, true);
-        text(c, kw < -0.05 ? "REGEN" : "POWER", 36, 368, 18, kw < -0.05 ? GREEN : MUTED, Paint.Align.LEFT, true);
+        text(c, charging ? "CHARGING" : kw < -0.05 ? "REGEN" : "POWER", 36, 368, 18,
+                charging ? BLUE : kw < -0.05 ? GREEN : MUTED, Paint.Align.LEFT, true);
         text(c, f1(Math.abs(kw)) + " kW", 36, 402, 30, TEXT, Paint.Align.LEFT, true);
 
         // ---- last 7 days chart ----

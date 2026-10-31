@@ -52,6 +52,13 @@ $out = & $java -cp "$Build\engine" CarRangeTest | Out-String
 Check "car range: D/S inference and per-mode consumption" ($out -match "ALL CAR RANGE TESTS PASSED")
 if ($out -notmatch "ALL CAR RANGE TESTS PASSED") { $out }
 
+# 1c3. charging while parked is neither regen nor consumption
+& $javac --release 8 -Xlint:-options -d "$Build\engine" "$Root\app\com\evrange\app\RangeEngine.java" "$Root\app\test\ChargingTest.java"
+if ($LASTEXITCODE -ne 0) { throw "charging tests did not compile" }
+$out = & $java -cp "$Build\engine" ChargingTest | Out-String
+Check "charging: detected, kept out of consumption and regen" ($out -match "ALL CHARGING TESTS PASSED")
+if ($out -notmatch "ALL CHARGING TESTS PASSED") { $out }
+
 # 1d. car-info probe model (index names, change tracking, VIN never logged)
 New-Item -ItemType Directory -Force "$Build\probe" | Out-Null
 & $javac --release 8 -Xlint:-options -d "$Build\probe" "$Root\probe\com\evprobe\app\ProbeModel.java" "$Root\probe\test\ProbeModelTest.java"

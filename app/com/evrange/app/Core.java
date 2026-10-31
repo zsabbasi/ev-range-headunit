@@ -96,11 +96,11 @@ public final class Core {
         }
         if (!running) {
             running = true;
-            // History version 2: distances before the rpm calibration used a 22 % too long ratio. Drop the
-            // saved history once and rebuild it from the log with the calibrated ratio.
-            if (!demo && prefs.getInt("histver", 0) < 2) {
+            // History version 3 (2 was the rpm calibration): charging energy used to be counted as negative
+            // consumption. Drop the saved history once and rebuild it from the log with the current rules.
+            if (!demo && prefs.getInt("histver", 0) < 3) {
                 stateFile().delete();
-                prefs.edit().putLong("pos", 0).putInt("histver", 2).apply();
+                prefs.edit().putLong("pos", 0).putInt("histver", 3).apply();
             }
             applyConfig();
             loadState();

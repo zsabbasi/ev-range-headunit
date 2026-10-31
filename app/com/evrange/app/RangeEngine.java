@@ -105,6 +105,9 @@ public final class RangeEngine {
             if (dt > 0 && dt <= maxGapMs) {
                 // trapezoidal integration: average of the previous and the current reading
                 double kwh = (lastKw + kwNow) / 2.0 * dt / 3.6e6;
+                if (kwh < 0 && lastAbsRpm == 0 && absRpmNow == 0) {
+                    kwh = 0; // energy flowing in while standing still is charging, not regen: not driving consumption
+                }
                 double revs = (lastAbsRpm + absRpmNow) / 2.0 * dt / 60000.0;
                 double km = gpsSpeedMs >= 0 ? gpsSpeedMs * dt / 1e6 : revs * kmPerMotorRev;
                 tripKm += km;
@@ -261,6 +264,11 @@ public final class RangeEngine {
 
     public double liveKw() {
         return lastKw;
+    }
+
+    /** True while the car is standing still with energy flowing into the battery: plugged in and charging. */
+    public boolean charging() {
+        return lastKw < -0.3 && lastAbsRpm == 0;
     }
 
     public int soc() {
