@@ -11,7 +11,7 @@ A real-world range estimate for one specific small EV, computed from **what you 
 
 | Folder | What it is |
 |---|---|
-| `app/` | **EV Range app**: the screen (range, kWh/100 km, trip / day / all-time averages, 7-day chart, regen, rated-range comparison). A normal Android app in its own process. |
+| `app/` | **EV Range app**: the screen (range, kWh/100 km, trip / day / all-time averages, 7-day chart, a live power bar scaled to this car's measured limits, speed, rated-range comparison). A normal Android app in its own process. |
 | `hook/` | **Data feed** (`com.ts.evhook`): reads battery voltage, current, SOC, temperatures and motor rpm from the car through the head unit's own software and writes a small CSV. Runs inside `com.ts.MainUI`. Has built-in safety brakes. |
 | `tools/` | Analysis scripts, including `calibrate_speed.py` (rpm vs GPS speed) and `vehicle_off_monitor.ps1`. |
 | `samples/` | A sanitized sample drive for demo mode and tests. |
@@ -59,7 +59,7 @@ Then follow [docs/INSTALL.md](docs/INSTALL.md) step by step (it verifies checksu
 
 ## Calibrating the distance
 
-The unit gives no vehicle speed in km/h, so distance needs a calibrated rpm-to-speed ratio. Drive with the app open, pull `gps_rpm_log.csv` from `/storage/emulated/0/Android/data/com.evrange.app/files/`, run `py -I tools\calibrate_speed.py gps_rpm_log.csv`, and enter the printed "speed at 3000 rpm" in the app's Settings. Details in the development log, section 15.
+The unit gives no vehicle speed in km/h, so distance needs a calibrated rpm-to-speed ratio. The measured ratio on the test car is **31.0 km/h at 3000 rpm** (0.0001722 km per motor revolution, checked against GPS to 0.6 % over a 31-minute drive); it is the app's default. To check it on your own unit, drive with the app open, pull `gps_rpm_log.csv` from `/storage/emulated/0/Android/data/com.evrange.app/files/`, run `py -I tools\calibrate_speed.py gps_rpm_log.csv`, and enter the printed "speed at 3000 rpm" in the app's Settings. Details in the development log, section 15.
 
 ## What is deliberately not in this repository
 

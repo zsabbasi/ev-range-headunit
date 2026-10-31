@@ -46,6 +46,8 @@ Optional demo: copy `samples/ev_demo_sanitized.csv` to `/storage/emulated/0/TsCa
 
 Open it from the unit's app list ("EV Range"). It shows "NO RECENT DATA" until the feed runs.
 
+**Updating the app:** Android only accepts an update signed with the **same key** as the installed copy. Build with the same keystore (`app\build.ps1 -Keystore <file> -StorePass <password>`); a build signed with a different key is refused (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`) and nothing changes. **If the unit stops the app:** it was observed marked "stopped" (something on the unit force-stops user apps; cause not identified). A stopped app does not receive the boot broadcast; open it once and it catches up from `ev_log.csv`.
+
 ## 3. The data feed (the risky part)
 
 Read [SAFETY.md](SAFETY.md) first. Then:
