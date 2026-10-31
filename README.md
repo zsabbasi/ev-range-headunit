@@ -5,13 +5,15 @@ A real-world range estimate for one specific small EV, computed from **what you 
 > **Experimental hobby project. Read [docs/SAFETY.md](docs/SAFETY.md) before installing anything.**
 > One part of it runs inside the head unit's main program and crashed it repeatedly during development before it was redesigned. It is **not** a safety system. Never rely on it alone for range planning.
 
+![Cruising at 55 km/h and 17 kW (demo mode, recorded sample drive)](docs/images/app_cruise.png)
+
 ![Live screen](docs/images/app_live.png)
 
 ## What is in here
 
 | Folder | What it is |
 |---|---|
-| `app/` | **EV Range app**: the screen (range, kWh/100 km, trip / day / all-time averages, 7-day chart, a live power bar scaled to this car's measured limits, speed, rated-range comparison). A normal Android app in its own process. |
+| `app/` | **EV Range app**: the screen (range, kWh/100 km, trip / day / all-time averages, 7-day chart, a live power bar scaled to this car's measured limits, speed, the car's own range and drive mode D/S, rated-range comparison; a red glow at the screen edges in S). A normal Android app in its own process. |
 | `hook/` | **Data feed** (`com.ts.evhook`): reads battery voltage, current, SOC, temperatures and motor rpm from the car through the head unit's own software and writes a small CSV. Runs inside `com.ts.MainUI`. Has built-in safety brakes. |
 | `probe/` | **Read-only probe** (`com.evprobe.app`, no permissions): shows the unit's own car-info values live (gear, brake, hand brake, ACC, tyre pressure fields, a distance counter, ...) and highlights what changes, to find out what this car actually sends. Calls only the read method of the unit's car-info interface. Never logs the VIN. |
 | `tools/` | Analysis scripts, including `calibrate_speed.py` (rpm vs GPS speed) and `vehicle_off_monitor.ps1`. |
