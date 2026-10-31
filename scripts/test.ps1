@@ -45,6 +45,14 @@ $out = & $java -cp "$Build\engine" SpeedTest | Out-String
 Check "speed: rpm conversion, GPS preference, stopped detection" ($out -match "ALL SPEED TESTS PASSED")
 if ($out -notmatch "ALL SPEED TESTS PASSED") { $out }
 
+# 1d. car-info probe model (index names, change tracking, VIN never logged)
+New-Item -ItemType Directory -Force "$Build\probe" | Out-Null
+& $javac --release 8 -Xlint:-options -d "$Build\probe" "$Root\probe\com\evprobe\app\ProbeModel.java" "$Root\probe\test\ProbeModelTest.java"
+if ($LASTEXITCODE -ne 0) { throw "probe tests did not compile" }
+$out = & $java -cp "$Build\probe" ProbeModelTest | Out-String
+Check "probe: names, change tracking, VIN excluded" ($out -match "ALL PROBE TESTS PASSED")
+if ($out -notmatch "ALL PROBE TESTS PASSED") { $out }
+
 # 2. data feed safety brakes, against a fake car library
 & $javac --release 8 -Xlint:-options -d "$Build\feed" "$Root\hook\com\ts\evhook\EvFeedCore.java" "$Root\hook\test\com\lgb\canmodule\CanDataInfo.java" "$Root\hook\test\com\lgb\canmodule\CanJni.java" "$Root\hook\test\FeedTest.java"
 if ($LASTEXITCODE -ne 0) { throw "feed tests did not compile" }

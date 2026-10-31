@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.evprobe.app"
+    android:versionCode="1"
+    android:versionName="0.1">
+
+    <uses-sdk
+        android:minSdkVersion="23"
+        android:targetSdkVersion="28" />
+
+    <!-- no permissions: it only binds to the unit's exported car-info service and calls the read method -->
+    <application
+        android:allowBackup="false"
+        android:label="CarInfo Probe"
+        android:theme="@android:style/Theme.DeviceDefault">
+        <activity
+            android:name=".ProbeActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:exported="true"
+            android:screenOrientation="landscape">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
