@@ -85,8 +85,9 @@ public final class Bubble {
                     PixelFormat.TRANSLUCENT);
             lp.gravity = Gravity.TOP | Gravity.LEFT;
             int screenW = app.getResources().getDisplayMetrics().widthPixels;
-            lp.x = prefs.getInt("bx", screenW - w - Math.round(16 * d));
-            lp.y = prefs.getInt("by", Math.round(80 * d));
+            // default spot: the empty middle of the unit's top bar (it can be dragged anywhere)
+            lp.x = prefs.getInt("bx", Math.round(screenW * 0.32f));
+            lp.y = prefs.getInt("by", Math.round(2 * d));
             view = new BubbleView(app, prefs);
             wm.addView(view, lp);
         } catch (Throwable t) {
