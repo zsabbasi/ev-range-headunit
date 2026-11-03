@@ -36,6 +36,7 @@ public final class Core {
     private static long lastSaveMs;
 
     public static boolean stale;
+    private static boolean appVisible;
     public static long ageSec;
     public static String mode = "";
 
@@ -69,6 +70,28 @@ public final class Core {
     /** CarRange.MODE_D, MODE_S or MODE_UNKNOWN, worked out from the car's own range and battery level. */
     public static int driveMode() {
         return demo || car == null ? CarRange.MODE_UNKNOWN : car.mode();
+    }
+
+    /** True while the app's own screen is in front: the floating bubble stays hidden then. */
+    public static void setAppVisible(boolean visible) {
+        appVisible = visible;
+    }
+
+    /** Asks the data feed to stop (true) or restore (false) the car's speed-linked volume. Needs feed v3. */
+    public static void setSpeedVolStop(boolean stop) {
+        try {
+            File dir = app.getExternalFilesDir(null);
+            if (dir == null) {
+                return;
+            }
+            FileOutputStream out = new FileOutputStream(new File(dir, SpeedVol.REQUEST_NAME), false);
+            try {
+                out.write(SpeedVol.requestText(stop).getBytes("UTF-8"));
+            } finally {
+                out.close();
+            }
+        } catch (Throwable ignored) {
+        }
     }
 
     /** Fresh GPS speed in km/h, or -1. */
@@ -245,6 +268,7 @@ public final class Core {
         ageSec = engine.lastSampleMs() <= 0 ? 999999 : (now - engine.lastSampleMs()) / 1000;
         stale = !demo && ageSec > STALE_SEC;
         mode = demo ? "DEMO (recorded drive)" : "LIVE";
+        Bubble.tick(app, prefs, engine, stale, appVisible, demo, driveMode());
         if (now - lastSaveMs > 30000) {
             saveState();
         }

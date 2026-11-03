@@ -59,6 +59,12 @@ $out = & $java -cp "$Build\engine" ChargingTest | Out-String
 Check "charging: detected, kept out of consumption and regen" ($out -match "ALL CHARGING TESTS PASSED")
 if ($out -notmatch "ALL CHARGING TESTS PASSED") { $out }
 
+# 1c4. speed-linked volume state and the floating bubble's show/hide rules
+& $javac --release 8 -Xlint:-options -d "$Build\engine" "$Root\app\com\evrange\app\SpeedVol.java" "$Root\app\com\evrange\app\BubbleLogic.java" "$Root\app\test\BubbleTest.java"
+if ($LASTEXITCODE -ne 0) { throw "bubble tests did not compile" }
+$out = & $java -cp "$Build\engine" BubbleTest | Out-String
+Check "bubble: speed-volume state, hide while reversing / standing / in the app" ($out -match "ALL BUBBLE TESTS PASSED")
+if ($out -notmatch "ALL BUBBLE TESTS PASSED") { $out }
 # 1d. car-info probe model (index names, change tracking, VIN never logged)
 New-Item -ItemType Directory -Force "$Build\probe" | Out-Null
 & $javac --release 8 -Xlint:-options -d "$Build\probe" "$Root\probe\com\evprobe\app\ProbeModel.java" "$Root\probe\test\ProbeModelTest.java"
@@ -68,7 +74,7 @@ Check "probe: names, change tracking, VIN excluded" ($out -match "ALL PROBE TEST
 if ($out -notmatch "ALL PROBE TESTS PASSED") { $out }
 
 # 2. data feed safety brakes, against a fake car library
-& $javac --release 8 -Xlint:-options -d "$Build\feed" "$Root\hook\com\ts\evhook\EvFeedCore.java" "$Root\hook\test\com\lgb\canmodule\CanDataInfo.java" "$Root\hook\test\com\lgb\canmodule\CanJni.java" "$Root\hook\test\FeedTest.java"
+& $javac --release 8 -Xlint:-options -d "$Build\feed" "$Root\hook\com\ts\evhook\EvFeedCore.java" "$Root\hook\test\com\lgb\canmodule\CanDataInfo.java" "$Root\hook\test\com\lgb\canmodule\CanJni.java" "$Root\hook\test\com\yyw\ts70xhw\FtSet.java" "$Root\hook\test\FeedTest.java"
 if ($LASTEXITCODE -ne 0) { throw "feed tests did not compile" }
 $out = & $java -cp "$Build\feed" FeedTest "$Build\feed-data" | Out-String
 Check "feed: all safety-brake tests pass" ($out -match "ALL TESTS PASSED")

@@ -18,6 +18,8 @@ import java.util.concurrent.LinkedBlockingQueue;
 public final class EvFeed {
     private static final String DIR = "/storage/emulated/0/TsCarInfo";
     private static final long MAX_LOG_BYTES = 10L * 1024 * 1024;
+    /** Where the EV Range app leaves its request for the speed-linked volume (its own folder, no permission needed). */
+    private static final String APP_REQUEST = "/storage/emulated/0/Android/data/com.evrange.app/files/speedvol_request.txt";
 
     private static boolean started;
 
@@ -48,6 +50,11 @@ public final class EvFeed {
         @Override
         public void status(String text) {
             q.offer(new String[] {"status", text});
+        }
+
+        @Override
+        public void speedVol(String text) {
+            q.offer(new String[] {"speedvol", text});
         }
 
         @Override
@@ -97,6 +104,19 @@ public final class EvFeed {
                     latest.delete();
                     tmp.renameTo(latest);
                 }
+            } else if (item[0].equals("speedvol")) {
+                File tmp = new File(dir, "evfeed_speedvol.tmp");
+                FileOutputStream out = new FileOutputStream(tmp, false);
+                try {
+                    out.write(item[1].getBytes("UTF-8"));
+                } finally {
+                    out.close();
+                }
+                File state = new File(dir, "evfeed_speedvol.txt");
+                if (!tmp.renameTo(state)) {
+                    state.delete();
+                    tmp.renameTo(state);
+                }
             } else {
                 if (item[1].equals(lastStatus)) {
                     return;
@@ -143,7 +163,8 @@ public final class EvFeed {
                 public void run() {
                     try {
                         if (core == null) {
-                            core = new EvFeedCore(loader(context), new File(DIR), writer);
+                            core = new EvFeedCore(loader(context), new File(DIR), writer,
+                                    new File[] {new File(APP_REQUEST), new File(DIR, "speedvol_request.txt")});
                         }
                         long next = core.step(System.currentTimeMillis());
                         if (next > 0) {

@@ -64,12 +64,14 @@ public class MainActivity extends Activity implements DashView.Listener {
     @Override
     protected void onResume() {
         super.onResume();
+        Core.setAppVisible(true);
         ui.post(refresh);
     }
 
     @Override
     protected void onPause() {
         super.onPause();
+        Core.setAppVisible(false);
         ui.removeCallbacks(refresh);
         Core.saveState();
     }
@@ -115,8 +117,35 @@ public class MainActivity extends Activity implements DashView.Listener {
         }
         srcGroup.check(100 + e.speedSource);
         box.addView(srcGroup);
-        final CheckBox demoBox = new CheckBox(this);
-        demoBox.setText("Demo mode (replay recorded drive from ev_demo.csv)");
+        // the car's speed-linked volume: needs the updated data feed, which reports its state
+        TextView volTitle = new TextView(this);
+        volTitle.setText("Car's speed-linked volume");
+        box.addView(volTitle);
+        final SpeedVol.State vs = SpeedVol.read(new java.io.File(SpeedVol.STATUS_PATH), System.currentTimeMillis());
+        TextView volNow = new TextView(this);
+        volNow.setText("Now: " + SpeedVol.label(vs));
+        box.addView(volNow);
+        final CheckBox volBox = new CheckBox(this);
+        volBox.setText("Stop the speed-linked volume");
+        volBox.setChecked(vs.boost == SpeedVol.BOOST_OFF);
+        volBox.setEnabled(vs.boost != SpeedVol.UNKNOWN);
+        box.addView(volBox);
+        // floating range bubble
+        TextView bubTitle = new TextView(this);
+        bubTitle.setText("Floating range bubble" + (Bubble.canDraw(this) ? ""
+                : " (needs the 'Draw over other apps' permission, see docs/INSTALL.md)"));
+        box.addView(bubTitle);
+        final RadioGroup bubGroup = new RadioGroup(this);
+        String[] bubNames = {"Off", "Only while driving (recommended)", "Always (can cover the reverse camera until you move)"};
+        for (int i = 0; i < bubNames.length; i++) {
+            RadioButton rb = new RadioButton(this);
+            rb.setId(200 + i);
+            rb.setText(bubNames[i]);
+            bubGroup.addView(rb);
+        }
+        bubGroup.check(200 + Core.prefs().getInt("bubble", BubbleLogic.DRIVING));
+        box.addView(bubGroup);
+        final CheckBox demoBox = new CheckBox(this);        demoBox.setText("Demo mode (replay recorded drive from ev_demo.csv)");
         demoBox.setChecked(Core.isDemo());
         box.addView(demoBox);
         // the dialog is taller than the 720 px screen: it must scroll to reach the speed source and demo options
@@ -126,7 +155,11 @@ public class MainActivity extends Activity implements DashView.Listener {
                 .setPositiveButton("Save", new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int w) {
-                        saveSettings(cap, rated, reserve, speed3000, known, srcGroup.getCheckedRadioButtonId() - 100, demoBox.isChecked());
+                        saveSettings(cap, rated, reserve, speed3000, known, srcGroup.getCheckedRadioButtonId() - 100,
+                                bubGroup.getCheckedRadioButtonId() - 200,
+                                volBox.isEnabled() && volBox.isChecked() != (vs.boost == SpeedVol.BOOST_OFF)
+                                        ? Boolean.valueOf(volBox.isChecked()) : null,
+                                demoBox.isChecked());
                     }
                 }).setNegativeButton("Cancel", null).show();
     }
@@ -151,7 +184,7 @@ public class MainActivity extends Activity implements DashView.Listener {
     }
 
     private void saveSettings(EditText cap, EditText rated, EditText reserve, EditText speed3000,
-            EditText known, int speedSource, boolean demoOn) {
+            EditText known, int speedSource, int bubbleMode, Boolean volStop, boolean demoOn) {
         RangeEngine e = Core.engine;
         SharedPreferences.Editor ed = Core.prefs().edit();
         double c = num(cap, e.capacityKwh);
@@ -160,6 +193,9 @@ public class MainActivity extends Activity implements DashView.Listener {
         }
         if (speedSource >= RangeEngine.SRC_AUTO && speedSource <= RangeEngine.SRC_GPS) {
             ed.putInt("speedsrc", speedSource);
+        }
+        if (bubbleMode >= BubbleLogic.OFF && bubbleMode <= BubbleLogic.ALWAYS) {
+            ed.putInt("bubble", bubbleMode);
         }
         ed.putLong("wltp", Double.doubleToLongBits(Math.max(0, num(rated, e.wltpKm))));
         ed.putLong("reserve", Double.doubleToLongBits(Math.max(0, num(reserve, e.reserveKm))));
@@ -174,5 +210,22 @@ public class MainActivity extends Activity implements DashView.Listener {
         Core.applyConfig();
         Core.setDemo(demoOn);
         view.invalidate();
+        if (volStop != null) {
+            confirmVol(volStop.booleanValue());
+        }
+    }
+
+    /** Changing the volume setting is a write to the head unit, so it is confirmed first. */
+    private void confirmVol(final boolean stop) {
+        new AlertDialog.Builder(this).setTitle("Change a setting on the head unit?")
+                .setMessage(stop ? "This stops the car's speed-linked volume: the music no longer gets louder as you speed up. "
+                        + "It changes a setting on the head unit, through the data feed. You can undo it here."
+                        : "This restores the car's speed-linked volume: the music gets louder as you speed up.")
+                .setPositiveButton(stop ? "Stop it" : "Restore it", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int w) {
+                        Core.setSpeedVolStop(stop);
+                    }
+                }).setNegativeButton("Cancel", null).show();
     }
 }

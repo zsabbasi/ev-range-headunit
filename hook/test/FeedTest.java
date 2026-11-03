@@ -1,4 +1,5 @@
 import com.lgb.canmodule.CanJni;
+import com.yyw.ts70xhw.FtSet;
 import com.ts.evhook.EvFeedCore;
 import java.io.File;
 import java.util.ArrayList;
@@ -17,6 +18,7 @@ public class FeedTest {
     static final class Rec implements EvFeedCore.Sink {
         final List<String> logs = new ArrayList<String>();
         final List<String> status = new ArrayList<String>();
+        String vol = "";
 
         public void log(String l) {
             logs.add(l);
@@ -28,6 +30,10 @@ public class FeedTest {
         public void status(String s) {
             status.add(s);
         }
+
+        public void speedVol(String s) {
+            vol = s;
+        }
     }
 
     static void clean(File d) {
@@ -37,6 +43,12 @@ public class FeedTest {
                 f.delete();
             }
         }
+    }
+
+    static void write(File f, String s) throws Exception {
+        java.io.FileOutputStream o = new java.io.FileOutputStream(f, false);
+        o.write(s.getBytes("UTF-8"));
+        o.close();
     }
 
     static void reset() {
@@ -172,6 +184,111 @@ public class FeedTest {
         last = c.step(t);
         check("wrong CAN type: idle 30 s, no queries", last == 30000 && CanJni.queries == 0);
 
+
+        // 9. speed-linked volume: the one setting the feed may write
+        File req = new File(dir, "speedvol_request.txt");
+        long T = t + 10000000L;
+        clean(dir);
+        reset();
+        FtSet.value = 0; FtSet.gets = 0; FtSet.sets = 0; FtSet.throwLinkage = false; FtSet.ignoreSet = false;
+        r = new Rec();
+        c = new EvFeedCore(cl, dir, r);
+        c.step(T);
+        check("no request file: nothing is written, state is reported as boost ON",
+                FtSet.sets == 0 && r.vol.contains("setting70=0") && r.vol.contains("boost=ON") && r.vol.contains("request=-1"));
+        write(req, "1");
+        c.step(T + 5000);
+        check("the check runs at most every 10 s (no write after 5 s)", FtSet.sets == 0);
+        c.step(T + 12000);
+        check("request 1: setting 70 is set to 1 once and read back", FtSet.sets == 1 && FtSet.value == 1
+                && r.vol.contains("boost=OFF") && r.vol.contains("set to 1, read back 1"));
+        c.step(T + 24000);
+        c.step(T + 36000);
+        check("while the state already matches the request, nothing more is written", FtSet.sets == 1);
+        write(req, "0");
+        c.step(T + 48000);
+        check("request 0 restores it", FtSet.sets == 2 && FtSet.value == 0 && r.vol.contains("boost=ON"));
+        write(req, "2");
+        c.step(T + 60000);
+        write(req, "yes");
+        c.step(T + 72000);
+        write(req, "");
+        c.step(T + 84000);
+        check("anything but exactly 0 or 1 is ignored", FtSet.sets == 2);
+        check("the feed itself is unaffected (not tripped)", !c.isTripped());
+
+        // 10. at most 6 changes an hour
+        clean(dir);
+        reset();
+        FtSet.value = 0; FtSet.sets = 0;
+        r = new Rec();
+        c = new EvFeedCore(cl, dir, r);
+        c.step(T);
+        boolean sawLimit = false;
+        for (int i = 0; i < 10; i++) {
+            write(req, i % 2 == 0 ? "1" : "0");
+            c.step(T + 12000L * (i + 1));
+            sawLimit |= r.vol.contains("limit");
+        }
+        check("more than 6 changes within an hour are refused (sets=" + FtSet.sets + ")", FtSet.sets == 6 && sawLimit);
+        write(req, FtSet.value == 0 ? "1" : "0");
+        c.step(T + 3700000L);
+        check("the limit lifts after an hour", FtSet.sets == 7);
+
+        // 11. a write that does not stick blocks further writes
+        clean(dir);
+        reset();
+        FtSet.value = 0; FtSet.sets = 0; FtSet.ignoreSet = true;
+        r = new Rec();
+        c = new EvFeedCore(cl, dir, r);
+        write(req, "1");
+        c.step(T);
+        c.step(T + 12000);
+        c.step(T + 24000);
+        check("read-back mismatch: one attempt only, then blocked", FtSet.sets == 1 && r.vol.contains("blocked"));
+        FtSet.ignoreSet = false;
+
+        // 12. the setting class failing disables only this feature, never the feed
+        clean(dir);
+        reset();
+        FtSet.value = 0; FtSet.sets = 0; FtSet.throwLinkage = true;
+        r = new Rec();
+        c = new EvFeedCore(cl, dir, r);
+        write(req, "1");
+        long next = c.step(T);
+        check("settings class failing: the feed carries on and is not tripped", next == EvFeedCore.POLL_MS && !c.isTripped());
+        check("settings class failing: reported as unavailable", r.vol.contains("boost=UNKNOWN") && r.vol.contains("unavailable"));
+        FtSet.throwLinkage = false;
+        c.step(T + 12000);
+        check("after a failure the feature stays off for the rest of the process", FtSet.sets == 0);
+
+        // 13. kill switch and wrong CAN type: no setting access at all
+        clean(dir);
+        reset();
+        FtSet.value = 0; FtSet.gets = 0; FtSet.sets = 0;
+        write(new File(dir, "evfeed.disable"), "x");
+        write(req, "1");
+        r = new Rec();
+        c = new EvFeedCore(cl, dir, r);
+        c.step(T);
+        check("kill switch present: the setting is not touched", FtSet.gets == 0 && FtSet.sets == 0);
+        clean(dir);
+        reset();
+        CanJni.type = 140;
+        write(req, "1");
+        c = new EvFeedCore(cl, dir, new Rec());
+        c.step(T);
+        check("wrong CAN type: the setting is not touched", FtSet.gets == 0 && FtSet.sets == 0);
+        // a request file in another location is honoured too (the app's own folder)
+        clean(dir);
+        reset();
+        FtSet.value = 0; FtSet.sets = 0;
+        File other = new File(dir, "app_request.txt");
+        write(other, "1");
+        r = new Rec();
+        c = new EvFeedCore(cl, dir, r, new File[] {new File(dir, "missing.txt"), other});
+        c.step(T);
+        check("the first request file that exists is used", FtSet.sets == 1 && FtSet.value == 1);
         clean(dir);
         System.out.println(failures == 0 ? "\nALL TESTS PASSED" : "\n" + failures + " TEST(S) FAILED");
         System.exit(failures == 0 ? 0 : 1);

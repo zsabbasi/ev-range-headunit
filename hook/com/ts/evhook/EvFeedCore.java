@@ -18,6 +18,9 @@ import java.util.Locale;
  * own CAN pages use). File output goes through the Sink, which hands it to another thread; that
  * thread never touches the native library.
  *
+ * One setting can be written: the unit's speed-linked volume (setting 70, see speedVol()). It only follows a
+ * request file with exactly 0 or 1, at most 6 changes an hour, and its failures never stop the feed.
+ *
  * Safety brakes (each one stops the feed for good until a human removes evfeed.tripped):
  *  - kill switch: file evfeed.disable (stops while it exists, resumes when removed)
  *  - crash-loop breaker: 3 process starts within 10 minutes
@@ -31,12 +34,21 @@ public final class EvFeedCore {
         void latest(String text);
 
         void status(String text);
+
+        /** The state of the car's speed-linked volume setting (key=value lines), at most every 30 s or on change. */
+        default void speedVol(String text) {
+        }
     }
 
     public static final int CAN_JIMAI_FL = 356;
     public static final long POLL_MS = 2000;
     public static final long IDLE_LOG_MS = 30000;
     public static final long SLOW_MS = 150;
+    /** The unit's setting number for the car's speed-linked volume: 0 = boost applied, anything else = off. */
+    public static final int SPEEDVOL_SETTING = 70;
+    public static final long VOL_CHECK_MS = 10000;
+    public static final long VOL_REPORT_MS = 30000;
+    public static final int VOL_MAX_CHANGES_PER_HOUR = 6;
     public static final String HEADER =
             "epoch_ms,time,volt,amp,soc,cell_max,cell_min,motor_temp,ctrl_temp,rpm,"
                     + "speed_raw,speed_dw,bms_nlhs,bms_bsmdfk,motor_djmxdl,motor_djnjyxw,motor_sjnj,"
@@ -64,10 +76,26 @@ public final class EvFeedCore {
     private long lastLogMs;
     private int lastSoc = -1;
 
+    private final File[] volRequestFiles;
+    private Method ftGet;
+    private Method ftSet;
+    private boolean volUnavailable;
+    private boolean volWriteBlocked;
+    private long lastVolCheck = -VOL_CHECK_MS;
+    private long lastVolReport;
+    private String lastVolText = "";
+    private final List<Long> volChanges = new ArrayList<Long>();
+
     public EvFeedCore(ClassLoader loader, File dir, Sink sink) {
+        this(loader, dir, sink, new File[] {new File(dir, "speedvol_request.txt")});
+    }
+
+    /** volRequestFiles: files that may hold the wanted speed-volume state, the first existing one is used. */
+    public EvFeedCore(ClassLoader loader, File dir, Sink sink, File[] volRequestFiles) {
         this.loader = loader;
         this.dir = dir;
         this.sink = sink;
+        this.volRequestFiles = volRequestFiles;
     }
 
     public boolean isTripped() {
@@ -240,6 +268,7 @@ public final class EvFeedCore {
                 slowStreak = 0;
             }
             errorStreak = 0;
+            speedVol(nowMs);
             return POLL_MS;
         } catch (Throwable th) {
             Throwable c = th.getCause() != null ? th.getCause() : th;
@@ -253,6 +282,105 @@ public final class EvFeedCore {
         }
     }
 
+
+    // ---- speed-linked volume (the one setting this feed may write) ----
+
+    /** Wanted state from the request file: 1 = stop the speed-linked volume, 0 = restore it, -1 = no valid request. */
+    private int readVolRequest() {
+        for (File f : volRequestFiles) {
+            try {
+                if (f != null && f.exists() && f.length() <= 16) {
+                    RandomAccessFile r = new RandomAccessFile(f, "r");
+                    try {
+                        byte[] b = new byte[(int) r.length()];
+                        r.readFully(b);
+                        String s = new String(b, "UTF-8").trim();
+                        if (s.equals("1")) {
+                            return 1;
+                        }
+                        if (s.equals("0")) {
+                            return 0;
+                        }
+                    } finally {
+                        r.close();
+                    }
+                    return -1;
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+        return -1;
+    }
+
+    private boolean volChangeAllowed(long nowMs) {
+        for (int i = volChanges.size() - 1; i >= 0; i--) {
+            if (nowMs - volChanges.get(i).longValue() >= 3600000L) {
+                volChanges.remove(i);
+            }
+        }
+        return volChanges.size() < VOL_MAX_CHANGES_PER_HOUR;
+    }
+
+    private void reportVol(long nowMs, int setting, int request, String note) {
+        String text = "setting" + SPEEDVOL_SETTING + "=" + setting + "\n"
+                + "boost=" + (setting < 0 ? "UNKNOWN" : setting == 0 ? "ON" : "OFF") + "\n"
+                + "request=" + request + "\n"
+                + "note=" + note + "\n";
+        if (text.equals(lastVolText) && nowMs - lastVolReport < VOL_REPORT_MS) {
+            return;
+        }
+        lastVolText = text;
+        lastVolReport = nowMs;
+        sink.speedVol("epoch_ms=" + nowMs + "\n" + text);
+    }
+
+    /**
+     * Keeps the unit's speed-linked volume at the wanted state, checked every 10 s. Reads setting 70 and, if a
+     * valid request file asks for a different state, writes it (same call as the unit's own switch). Any failure
+     * here switches only this feature off; it never stops or trips the feed.
+     */
+    private void speedVol(long nowMs) {
+        if (volUnavailable || nowMs - lastVolCheck < VOL_CHECK_MS) {
+            return;
+        }
+        lastVolCheck = nowMs;
+        int request = -1;
+        try {
+            if (ftGet == null) {
+                Class<?> ft = Class.forName("com.yyw.ts70xhw.FtSet", false, loader);
+                ftGet = ft.getMethod("GetCanS", int.class);
+                ftSet = ft.getMethod("SetCanS", byte.class, int.class);
+            }
+            int current = ((Integer) ftGet.invoke(null, Integer.valueOf(SPEEDVOL_SETTING))).intValue();
+            request = readVolRequest();
+            String note = "";
+            int isOff = current != 0 ? 1 : 0;
+            if (request >= 0 && request != isOff) {
+                if (volWriteBlocked) {
+                    note = "writes blocked after an earlier read-back mismatch";
+                } else if (!volChangeAllowed(nowMs)) {
+                    note = "change refused: limit of " + VOL_MAX_CHANGES_PER_HOUR + " per hour";
+                } else {
+                    ftSet.invoke(null, Byte.valueOf((byte) request), Integer.valueOf(SPEEDVOL_SETTING));
+                    volChanges.add(Long.valueOf(nowMs));
+                    int after = ((Integer) ftGet.invoke(null, Integer.valueOf(SPEEDVOL_SETTING))).intValue();
+                    note = "set to " + request + ", read back " + after;
+                    if ((after != 0 ? 1 : 0) != request) {
+                        volWriteBlocked = true;
+                        note += " (differs: further writes blocked)";
+                    }
+                    current = after;
+                }
+            }
+            reportVol(nowMs, current, request, note);
+        } catch (Throwable th) {
+            Throwable c = th.getCause() != null ? th.getCause() : th;
+            volUnavailable = true;
+            sink.status("speed volume control unavailable: " + c);
+            sink.speedVol("epoch_ms=" + nowMs + "\nsetting" + SPEEDVOL_SETTING + "=-1\nboost=UNKNOWN\nrequest=" + request
+                    + "\nnote=unavailable: " + c + "\n");
+        }
+    }
     private void record(long nowMs, Object bms, Object motor) throws Exception {
         int dcdl = geti(bms, "Dcdl");
         int djzs = geti(motor, "Djzs");
