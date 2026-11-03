@@ -18,7 +18,7 @@ import java.util.Locale;
  * own CAN pages use). File output goes through the Sink, which hands it to another thread; that
  * thread never touches the native library.
  *
- * One setting can be written: the unit's speed-linked volume (setting 70, see speedVol()). It only follows a
+ * The air-conditioning state is only read and logged (acLog). One setting can be written: the unit's speed-linked volume (setting 70, see speedVol()). It only follows a
  * request file with exactly 0 or 1, at most 6 changes an hour, and its failures never stop the feed.
  *
  * Safety brakes (each one stops the feed for good until a human removes evfeed.tripped):
@@ -37,6 +37,10 @@ public final class EvFeedCore {
 
         /** The state of the car's speed-linked volume setting (key=value lines), at most every 30 s or on change. */
         default void speedVol(String text) {
+        }
+
+        /** One line of the air-conditioning log (see AC_HEADER), when the state changes and every minute. */
+        default void ac(String line) {
         }
     }
 
@@ -269,6 +273,7 @@ public final class EvFeedCore {
             }
             errorStreak = 0;
             speedVol(nowMs);
+            acLog(nowMs);
             return POLL_MS;
         } catch (Throwable th) {
             Throwable c = th.getCause() != null ? th.getCause() : th;
@@ -283,6 +288,74 @@ public final class EvFeedCore {
     }
 
 
+
+    // ---- air conditioning state (read-only) ----
+
+    private static final String[] AC_INT_FIELDS = {"PWR", "fgAC", "fgACMax", "fgAutoAC", "fgAutoMode", "fgInnerLoop",
+            "fgLoopDisable", "fgDFBL", "fgHeat", "fgPTC", "fgEco", "fgUpWind", "fgParallelWind", "fgDownWind",
+            "fgForeWindMode", "nWindValue", "nLeftTemp", "nRightTemp", "nInTemp", "fgAcErr1"};
+    private static final String[] AC_STRING_FIELDS = {"szLtTemp", "szRtTemp"};
+    public static final long AC_HEARTBEAT_MS = 60000;
+    public static final String AC_HEADER = "epoch_ms,time,pwr,ac,ac_max,auto_ac,auto_mode,inner_loop,loop_disable,"
+            + "defrost,heat,ptc,eco,wind_up,wind_parallel,wind_down,wind_fore,fan,left_temp,right_temp,in_temp,err1,"
+            + "lt_text,rt_text\n";
+
+    private Class<?> acClass;
+    private Method getAc;
+    private boolean acUnavailable;
+    private String lastAcState = null;
+    private long lastAcLogMs;
+
+    private static String gets(Object o, String field) throws Exception {
+        Object v = o.getClass().getField(field).get(o);
+        return v == null ? "" : v.toString().replace(',', ' ').replace('\n', ' ').trim();
+    }
+
+    /**
+     * Logs the car's air-conditioning state (including the inner-loop / recirculation flag) when it changes and
+     * at least once a minute. Read-only: GetACInfo returns what the unit has already received, exactly as the
+     * unit's own AC screen reads it; nothing is sent to the car. Any failure switches only this logging off.
+     */
+    private void acLog(long nowMs) {
+        if (acUnavailable) {
+            return;
+        }
+        try {
+            if (getAc == null) {
+                Class<?> jni = Class.forName("com.lgb.canmodule.CanJni", false, loader);
+                Class<?> info = Class.forName("com.lgb.canmodule.CanDataInfo", false, loader);
+                for (Class<?> c : info.getDeclaredClasses()) {
+                    if (c.getSimpleName().equals("CAN_ACInfo")) {
+                        acClass = c;
+                    }
+                }
+                if (acClass == null) {
+                    throw new IllegalStateException("CAN_ACInfo not found");
+                }
+                getAc = jni.getMethod("GetACInfo", acClass);
+            }
+            Object ac = acClass.newInstance();
+            getAc.invoke(null, ac);
+            StringBuilder state = new StringBuilder();
+            for (String f : AC_INT_FIELDS) {
+                state.append(',').append(geti(ac, f));
+            }
+            for (String f : AC_STRING_FIELDS) {
+                state.append(',').append(gets(ac, f));
+            }
+            String s = state.toString();
+            if (s.equals(lastAcState) && nowMs - lastAcLogMs < AC_HEARTBEAT_MS) {
+                return;
+            }
+            lastAcState = s;
+            lastAcLogMs = nowMs;
+            sink.ac(nowMs + "," + fmt.format(new Date(nowMs)) + s + "\n");
+        } catch (Throwable th) {
+            Throwable c = th.getCause() != null ? th.getCause() : th;
+            acUnavailable = true;
+            sink.status("AC logging unavailable: " + c);
+        }
+    }
     // ---- speed-linked volume (the one setting this feed may write) ----
 
     /** Wanted state from the request file: 1 = stop the speed-linked volume, 0 = restore it, -1 = no valid request. */

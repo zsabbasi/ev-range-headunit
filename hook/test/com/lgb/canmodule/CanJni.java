@@ -41,6 +41,23 @@ public class CanJni {
         o.UpdateOnce = 1;
     }
 
+    public static int acInner = 0;
+    public static int acFan = 0;
+    public static int acReads = 0;
+    public static boolean acThrow = false;
+    public static String acLeft = "22";
+
+    public static void GetACInfo(CanDataInfo.CAN_ACInfo o) {
+        acReads++;
+        if (acThrow) {
+            throw new UnsatisfiedLinkError("simulated");
+        }
+        o.fgInnerLoop = acInner;
+        o.nWindValue = acFan;
+        o.szLtTemp = acLeft;
+        o.fgAC = 1;
+    }
+
     public static void JiMaiFlGetMotorInfo(CanDataInfo.JiMaiFl_MotorInfo o) {
         o.Djwd = 73;
         o.Djkzqwd = 74;

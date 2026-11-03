@@ -19,6 +19,7 @@ public class FeedTest {
         final List<String> logs = new ArrayList<String>();
         final List<String> status = new ArrayList<String>();
         String vol = "";
+        final List<String> ac = new ArrayList<String>();
 
         public void log(String l) {
             logs.add(l);
@@ -33,6 +34,10 @@ public class FeedTest {
 
         public void speedVol(String s) {
             vol = s;
+        }
+
+        public void ac(String s) {
+            ac.add(s);
         }
     }
 
@@ -289,6 +294,64 @@ public class FeedTest {
         c = new EvFeedCore(cl, dir, r, new File[] {new File(dir, "missing.txt"), other});
         c.step(T);
         check("the first request file that exists is used", FtSet.sets == 1 && FtSet.value == 1);
+
+        // 14. air-conditioning log: read-only, on change plus a heartbeat
+        clean(dir);
+        reset();
+        CanJni.acInner = 0; CanJni.acFan = 3; CanJni.acReads = 0; CanJni.acThrow = false; CanJni.acLeft = "22";
+        FtSet.value = 0; FtSet.sets = 0; FtSet.throwLinkage = false;
+        r = new Rec();
+        c = new EvFeedCore(cl, dir, r);
+        c.step(T);
+        check("the first read is logged", r.ac.size() == 1 && r.ac.get(0).contains(",22") );
+        c.step(T + 2000);
+        c.step(T + 4000);
+        check("an unchanged state is not logged again within a minute", r.ac.size() == 1 && CanJni.acReads == 3);
+        CanJni.acInner = 1;
+        c.step(T + 6000);
+        check("a change (recirculation switched on) is logged at once", r.ac.size() == 2);
+        String[] cols = r.ac.get(1).trim().split(",", -1);
+        String[] hdr = EvFeedCore.AC_HEADER.trim().split(",", -1);
+        int idx = java.util.Arrays.asList(hdr).indexOf("inner_loop");
+        check("the log line has one value per header column", cols.length == hdr.length);
+        check("the inner_loop column carries the flag", idx > 0 && cols[idx].equals("1"));
+        CanJni.acLeft = "21,5\nx";
+        c.step(T + 8000);
+        check("commas and newlines in text values cannot break the line", r.ac.size() == 3 && r.ac.get(2).trim().split(",", -1).length == hdr.length
+                && r.ac.get(2).indexOf('\n') == r.ac.get(2).length() - 1);
+        c.step(T + 8000 + EvFeedCore.AC_HEARTBEAT_MS);
+        check("a heartbeat line is written after a minute without change", r.ac.size() == 4);
+        check("AC logging never writes to the setting or to the car", FtSet.sets == 0);
+
+        // 15. AC reading failing disables only the AC log
+        clean(dir);
+        reset();
+        CanJni.acThrow = true; CanJni.acReads = 0;
+        r = new Rec();
+        c = new EvFeedCore(cl, dir, r);
+        long nxt = c.step(T);
+        check("AC read failing: the feed carries on, not tripped", nxt == EvFeedCore.POLL_MS && !c.isTripped());
+        check("AC read failing: reported once, then not retried", r.status.toString().contains("AC logging unavailable"));
+        int readsAfterFirst = CanJni.acReads;
+        c.step(T + 2000);
+        c.step(T + 4000);
+        check("after an AC failure it is not called again", CanJni.acReads == readsAfterFirst);
+        CanJni.acThrow = false;
+
+        // 16. no AC reads when the feed is paused or the CAN type is wrong
+        clean(dir);
+        reset();
+        CanJni.acReads = 0;
+        write(new File(dir, "evfeed.disable"), "x");
+        c = new EvFeedCore(cl, dir, new Rec());
+        c.step(T);
+        check("kill switch present: the AC state is not read", CanJni.acReads == 0);
+        clean(dir);
+        reset();
+        CanJni.type = 140;
+        c = new EvFeedCore(cl, dir, new Rec());
+        c.step(T);
+        check("wrong CAN type: the AC state is not read", CanJni.acReads == 0);
         clean(dir);
         System.out.println(failures == 0 ? "\nALL TESTS PASSED" : "\n" + failures + " TEST(S) FAILED");
         System.exit(failures == 0 ? 0 : 1);

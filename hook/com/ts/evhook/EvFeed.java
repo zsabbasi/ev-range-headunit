@@ -18,6 +18,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 public final class EvFeed {
     private static final String DIR = "/storage/emulated/0/TsCarInfo";
     private static final long MAX_LOG_BYTES = 10L * 1024 * 1024;
+    private static final long MAX_AC_LOG_BYTES = 2L * 1024 * 1024;
     /** Where the EV Range app leaves its request for the speed-linked volume (its own folder, no permission needed). */
     private static final String APP_REQUEST = "/storage/emulated/0/Android/data/com.evrange.app/files/speedvol_request.txt";
 
@@ -55,6 +56,11 @@ public final class EvFeed {
         @Override
         public void speedVol(String text) {
             q.offer(new String[] {"speedvol", text});
+        }
+
+        @Override
+        public void ac(String line) {
+            q.offer(new String[] {"ac", line});
         }
 
         @Override
@@ -103,6 +109,25 @@ public final class EvFeed {
                 if (!tmp.renameTo(latest)) {
                     latest.delete();
                     tmp.renameTo(latest);
+                }
+            } else if (item[0].equals("ac")) {
+                File log = new File(dir, "ac_log.csv");
+                if (log.exists() && log.length() > MAX_AC_LOG_BYTES) {
+                    File old = new File(dir, "ac_log.1.csv");
+                    if (old.exists()) {
+                        old.delete();
+                    }
+                    log.renameTo(old);
+                }
+                boolean fresh = !log.exists();
+                FileOutputStream out = new FileOutputStream(log, true);
+                try {
+                    if (fresh) {
+                        out.write(EvFeedCore.AC_HEADER.getBytes("UTF-8"));
+                    }
+                    out.write(item[1].getBytes("UTF-8"));
+                } finally {
+                    out.close();
                 }
             } else if (item[0].equals("speedvol")) {
                 File tmp = new File(dir, "evfeed_speedvol.tmp");
