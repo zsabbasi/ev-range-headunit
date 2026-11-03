@@ -56,6 +56,12 @@ public class FeedTest {
         o.close();
     }
 
+    static void writeBytes(File f, int n) throws Exception {
+        java.io.FileOutputStream o = new java.io.FileOutputStream(f, false);
+        o.write(new byte[n]);
+        o.close();
+    }
+
     static void reset() {
         CanJni.type = 356;
         CanJni.amp = 500;
@@ -352,6 +358,26 @@ public class FeedTest {
         c = new EvFeedCore(cl, dir, new Rec());
         c.step(T);
         check("wrong CAN type: the AC state is not read", CanJni.acReads == 0);
+
+        // 17. log size limits
+        clean(dir);
+        File big = new File(dir, "ev_log.csv");
+        File bigOld = new File(dir, "ev_log.1.csv");
+        writeBytes(big, 100);
+        check("rotation: a log under the limit is left alone", !EvFeedCore.rotateIfBig(big, 1000) && big.exists());
+        java.io.FileOutputStream bo = new java.io.FileOutputStream(big, false);
+        bo.write(new byte[1500]);
+        bo.close();
+        check("rotation: a log over the limit becomes name.1.ext", EvFeedCore.rotateIfBig(big, 1000) && !big.exists() && bigOld.length() == 1500);
+        writeBytes(big, 10);
+        java.io.FileOutputStream bo2 = new java.io.FileOutputStream(big, false);
+        bo2.write(new byte[2000]);
+        bo2.close();
+        check("rotation: the next rotation replaces the old copy, only one is kept",
+                EvFeedCore.rotateIfBig(big, 1000) && bigOld.length() == 2000 && dir.listFiles().length == 1);
+        File st = new File(dir, "evfeed_status.txt");
+        writeBytes(st, 5);
+        check("rotation: other names work the same way", !EvFeedCore.rotateIfBig(st, 1000) && st.exists());
         clean(dir);
         System.out.println(failures == 0 ? "\nALL TESTS PASSED" : "\n" + failures + " TEST(S) FAILED");
         System.exit(failures == 0 ? 0 : 1);

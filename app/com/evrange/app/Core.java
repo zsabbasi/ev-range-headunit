@@ -19,6 +19,9 @@ public final class Core {
     public static final String DEMO_PATH = "/storage/emulated/0/TsCarInfo/ev_demo.csv";
     /** The feed writes at most one line per 30 s while idle, so only call data stale after this. */
     public static final long STALE_SEC = 45;
+    /** Log size limits (each log keeps one old copy, so it never takes more than twice this). */
+    public static final long CALIBRATION_LOG_MAX = 3L * 1024 * 1024;
+    public static final long CARINFO_LOG_MAX = 1024L * 1024;
 
     public static final RangeEngine engine = new RangeEngine();
 
@@ -215,6 +218,7 @@ public final class Core {
                 return;
             }
             File f = new File(dir, "gps_rpm_log.csv");
+            LogCap.rotateIfBig(f, CALIBRATION_LOG_MAX);
             boolean fresh = !f.exists();
             FileOutputStream out = new FileOutputStream(f, true);
             try {
@@ -296,6 +300,7 @@ public final class Core {
                 return;
             }
             File f = new File(dir, "carinfo_log.csv");
+            LogCap.rotateIfBig(f, CARINFO_LOG_MAX);
             boolean fresh = !f.exists();
             FileOutputStream out = new FileOutputStream(f, true);
             try {

@@ -19,6 +19,7 @@ public final class EvFeed {
     private static final String DIR = "/storage/emulated/0/TsCarInfo";
     private static final long MAX_LOG_BYTES = 10L * 1024 * 1024;
     private static final long MAX_AC_LOG_BYTES = 2L * 1024 * 1024;
+    private static final long MAX_STATUS_BYTES = 256L * 1024;
     /** Where the EV Range app leaves its request for the speed-linked volume (its own folder, no permission needed). */
     private static final String APP_REQUEST = "/storage/emulated/0/Android/data/com.evrange.app/files/speedvol_request.txt";
 
@@ -80,13 +81,7 @@ public final class EvFeed {
             }
             if (item[0].equals("log")) {
                 File log = new File(dir, "ev_log.csv");
-                if (log.exists() && log.length() > MAX_LOG_BYTES) {
-                    File old = new File(dir, "ev_log.1.csv");
-                    if (old.exists()) {
-                        old.delete();
-                    }
-                    log.renameTo(old);
-                }
+                EvFeedCore.rotateIfBig(log, MAX_LOG_BYTES);
                 boolean fresh = !log.exists();
                 FileOutputStream out = new FileOutputStream(log, true);
                 try {
@@ -112,13 +107,7 @@ public final class EvFeed {
                 }
             } else if (item[0].equals("ac")) {
                 File log = new File(dir, "ac_log.csv");
-                if (log.exists() && log.length() > MAX_AC_LOG_BYTES) {
-                    File old = new File(dir, "ac_log.1.csv");
-                    if (old.exists()) {
-                        old.delete();
-                    }
-                    log.renameTo(old);
-                }
+                EvFeedCore.rotateIfBig(log, MAX_AC_LOG_BYTES);
                 boolean fresh = !log.exists();
                 FileOutputStream out = new FileOutputStream(log, true);
                 try {
@@ -147,7 +136,9 @@ public final class EvFeed {
                     return;
                 }
                 lastStatus = item[1];
-                FileOutputStream out = new FileOutputStream(new File(dir, "evfeed_status.txt"), true);
+                File statusFile = new File(dir, "evfeed_status.txt");
+                EvFeedCore.rotateIfBig(statusFile, MAX_STATUS_BYTES);
+                FileOutputStream out = new FileOutputStream(statusFile, true);
                 try {
                     String ts = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date());
                     out.write((ts + "  " + item[1] + "\n").getBytes("UTF-8"));

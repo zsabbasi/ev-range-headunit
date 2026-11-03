@@ -200,6 +200,23 @@ public final class EvFeedCore {
         sink.status("resolved CanJni via " + jni.getClassLoader());
     }
 
+    /** Once a log is over maxBytes it becomes the single old copy (name.1.ext) and a new file starts. Never throws. */
+    public static boolean rotateIfBig(File f, long maxBytes) {
+        try {
+            if (f.exists() && f.length() > maxBytes) {
+                String n = f.getName();
+                int dot = n.lastIndexOf('.');
+                File old = new File(f.getParentFile(), dot > 0 ? n.substring(0, dot) + ".1" + n.substring(dot) : n + ".1");
+                if (old.exists()) {
+                    old.delete();
+                }
+                return f.renameTo(old);
+            }
+        } catch (Throwable ignored) {
+        }
+        return false;
+    }
+
     private static int geti(Object o, String field) throws Exception {
         Field f = o.getClass().getField(field);
         return f.getInt(o);

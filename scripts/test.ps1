@@ -65,6 +65,12 @@ if ($LASTEXITCODE -ne 0) { throw "bubble tests did not compile" }
 $out = & $java -cp "$Build\engine" BubbleTest | Out-String
 Check "bubble: speed-volume state, hide while reversing / standing / in the app" ($out -match "ALL BUBBLE TESTS PASSED")
 if ($out -notmatch "ALL BUBBLE TESTS PASSED") { $out }
+# 1c5. log size limits: one old copy, never more than about twice the limit
+& $javac --release 8 -Xlint:-options -d "$Build\engine" "$Root\app\com\evrange\app\LogCap.java" "$Root\app\test\LogCapTest.java"
+if ($LASTEXITCODE -ne 0) { throw "log cap tests did not compile" }
+$out = & $java -cp "$Build\engine" LogCapTest "$Build\logcap-data" | Out-String
+Check "log cap: rotates to a single old copy" ($out -match "ALL LOG CAP TESTS PASSED")
+if ($out -notmatch "ALL LOG CAP TESTS PASSED") { $out }
 # 1d. car-info probe model (index names, change tracking, VIN never logged)
 New-Item -ItemType Directory -Force "$Build\probe" | Out-Null
 & $javac --release 8 -Xlint:-options -d "$Build\probe" "$Root\probe\com\evprobe\app\ProbeModel.java" "$Root\probe\test\ProbeModelTest.java"
