@@ -73,6 +73,19 @@ Expected: a `resolved CanJni` line, fresh data rows, and `MainUI` keeping its pr
 
 After that the feed starts by itself about 60 seconds after every `MainUI` start (boot or restart).
 
+**Updating the feed:** installing a new feed version does **not** restart `MainUI`, so the old code keeps running until the process restarts. `am force-stop com.ts.MainUI` does nothing (it is a persistent system app). `adb shell am crash com.ts.MainUI` makes the system restart it: music, radio and the screen drop for about a minute, the feed starts again 60 s later, and a crash entry is logged. Do it parked, and no more than twice within 10 minutes (the crash-loop breaker). Check afterwards that `evfeed_status.txt` shows a new start and `evfeed.tripped` does not exist.
+
+## 3b. Optional features (app 0.7 and later, feed 3.0 and later)
+
+- **Floating range bubble.** The unit has no screen for the "Draw over other apps" permission; grant it over adb:
+  ```
+  adb shell "appops set com.evrange.app SYSTEM_ALERT_WINDOW allow; appops get com.evrange.app SYSTEM_ALERT_WINDOW; echo G_DONE"
+  ```
+  Then choose the mode in the app's Settings: off, only while driving (default) or always. Read [the notes on the reverse camera in SAFETY.md](SAFETY.md#the-floating-bubble-and-the-reverse-camera) first.
+- **Speed-linked volume off.** Needs feed 3.0 or later, running. Open Settings: it shows "Now: ON (volume rises with speed)"; tick "Stop the speed-linked volume", save and confirm. Settings shows OFF within about 10 s. To undo, untick and confirm. The feed's state is in `evfeed_speedvol.txt`. See [SAFETY.md](SAFETY.md#the-one-setting-the-feed-can-write) for what the feed will and will not do.
+- **Air-conditioning log (feed 3.1 and later).** `ac_log.csv` in the feed's folder records the air-conditioning state the unit receives, when it changes and once a minute (read-only). On the test car nothing in it ever changed, which means the car's air conditioning is not connected to the unit; if yours changes when you press the buttons, it is.
+- **Log cleanup.** Every growing log keeps one old copy: when it passes its limit it becomes `name.1.ext` and a fresh file starts, so nothing takes more than about twice its limit (data log 10 MB, AC log 2 MB, feed status 256 KB, the app's calibration log 3 MB and car-info log 1 MB). Nothing needs doing by hand.
+
 ## 4. Undo
 
 ```

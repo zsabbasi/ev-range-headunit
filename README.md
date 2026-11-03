@@ -14,7 +14,7 @@ A real-world range estimate for one specific small EV, computed from **what you 
 | Folder | What it is |
 |---|---|
 | `app/` | **EV Range app**: the screen (range, kWh/100 km, trip / day / all-time averages, 7-day chart, a live power bar scaled to this car's measured limits, speed, the car's own range and drive mode D/S, rated-range comparison; a red glow at the screen edges in S). A normal Android app in its own process. |
-| `hook/` | **Data feed** (`com.ts.evhook`): reads battery voltage, current, SOC, temperatures and motor rpm from the car through the head unit's own software and writes a small CSV. Runs inside `com.ts.MainUI`. Has built-in safety brakes. |
+| `hook/` | **Data feed** (`com.ts.evhook`): reads battery voltage, current, SOC, temperatures and motor rpm from the car through the head unit's own software and writes a small CSV, plus a read-only log of the air-conditioning state and, on request, switches off the unit's speed-linked volume (its only write). Runs inside `com.ts.MainUI`. Has built-in safety brakes and rotating logs. |
 | `probe/` | **Read-only probe** (`com.evprobe.app`, no permissions): shows the unit's own car-info values live (gear, brake, hand brake, ACC, tyre pressure fields, a distance counter, ...) and highlights what changes, to find out what this car actually sends. Calls only the read method of the unit's car-info interface. Never logs the VIN. |
 | `tools/` | Analysis scripts, including `calibrate_speed.py` (rpm vs GPS speed) and `vehicle_off_monitor.ps1`. |
 | `samples/` | A sanitized sample drive for demo mode and tests. |
@@ -35,7 +35,11 @@ car CAN bus -> head-unit MCU -> head-unit software (MainUI + libcan59)
 - Energy comes from battery voltage x current, so it includes regen and hills.
 - Range = remaining energy (capacity x SOC) / consumption over the **last 10 / 25 / 50 km** (selectable). Until there is enough distance it falls back to the trip average, the all-time average, then a default.
 - Distance comes from GPS speed when there is a fix, otherwise from motor rpm with a calibrated ratio (see `tools/calibrate_speed.py`).
-- With the vehicle off the unit suspends (tested): nothing is logged or sent.
+- With the vehicle off the unit suspends (tested): nothing is logged or sent. (While charging overnight the unit sleeps and logs nothing, so charged energy in the log is an under-count.)
+- The app also shows the car's own range and drive mode (D or S, worked out from range per percent), keeps consumption separately for D and S, and can float a small range bubble over other screens (off the reverse camera by default).
+- One opt-in write: the feed can turn off the head unit's speed-linked volume at your request (app Settings; see `docs/SAFETY.md`).
+
+**What it found on the test car (four days, 210 km, mostly city driving):** usable energy about 17.9 kWh per 100 % of battery (nominal 19.14 kWh); 12.7 kWh/100 km moving, 14.2 including standing-still drain; best at 40 to 60 km/h (about 9 kWh/100 km); S mode uses about 50 % more than D. That is roughly 125 to 140 km on a full charge in mixed driving, against the car's own 243 km (D) claim. The motor reached 151 °C in repeated full-power runs; the dashboard speedometer reads about 3 to 4 km/h above true speed. Details in `docs/HEADUNIT_EV_HOOK.md`.
 
 ## Compatibility: exactly one setup
 
